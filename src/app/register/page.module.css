@@ -1,0 +1,130 @@
+.container {
+  min-height: 100vh;
+  height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.card {
+  width: 100%;
+  max-width: 450px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  color: #1890ff;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  font-size: 14px;
+}
+
+.stepIndicator {
+  margin-bottom: 24px;
+}
+
+.stepContent {
+  text-align: center;
+}
+
+.stepTitle {
+  margin-bottom: 6px;
+}
+
+.stepDescription {
+  font-size: 14px;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.input {
+  border-radius: 8px;
+}
+
+.otpInput {
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  letter-spacing: 3px;
+}
+
+.emailValidIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #ff4d4f;
+}
+
+.personalRow {
+  margin-bottom: 16px;
+}
+
+.resendSection {
+  margin-top: 16px;
+}
+
+.resendText {
+  font-size: 14px;
+}
+
+.resendButton {
+  padding: 0;
+  font-size: 14px;
+}
+
+.errorText {
+  font-size: 14px;
+}
+
+.successIcon {
+  color: #52c41a;
+}
+
+.buttonContainer {
+  margin-top: 24px;
+}
+
+.buttonSpace {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.button {
+  border-radius: 8px;
+  min-width: 100px;
+}
+
+.primaryButton {
+  border-radius: 8px;
+  min-width: 100px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.footerText {
+  font-size: 14px;
+}
+
+.footerLink {
+  color: #1890ff;
+  text-decoration: none;
+  font-size: 14px;
+}
