@@ -81,19 +81,29 @@ const ForgotPasswordForm: React.FC = () => {
           onNext={async (password) => {
             setLoading(true);
             try {
-              console.log("Reset password params:", { email, otp, newPassword: password });
-              const res = await resetPassword({ email, otp, newPassword: password });
+              console.log("[DEBUG] Reset password step called");
+              console.log("[DEBUG] Email:", email);
+              console.log("[DEBUG] OTP:", otp);
+              console.log("[DEBUG] New password:", password);
+              const params = { email, otp, newPassword: password };
+              console.log("[DEBUG] Params to resetPassword:", params);
+              const res = await resetPassword(params);
+              console.log("[DEBUG] Response from resetPassword:", res);
               if (
                 res &&
                 (res.statusCode === 201 ||
                   res.statusCode === 200 ||
                   res.message?.toLowerCase().includes("success"))
               ) {
+                console.log("[DEBUG] Password reset successful, moving to next step");
+                message.success("Đổi mật khẩu thành công!");
                 handleNext();
               } else {
+                console.error("[DEBUG] Password reset failed:", res);
                 message.error(res.message || "Đặt lại mật khẩu thất bại");
               }
             } catch (err) {
+              console.error("[DEBUG] Exception during password reset:", err);
               message.error("Đặt lại mật khẩu thất bại");
             } finally {
               setLoading(false);

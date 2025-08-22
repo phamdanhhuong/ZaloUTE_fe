@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Card, Typography } from "antd";
 import Link from "next/link";
-import { RegisterForm, SuccessStep } from "@/features/auth/components";
+import { RegisterForm, SuccessStep } from "@/features/auth/register/components";
 import { CurrentStep } from "@/features/auth/hooks";
 import styles from "./page.module.css";
 

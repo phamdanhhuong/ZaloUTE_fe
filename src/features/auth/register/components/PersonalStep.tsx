@@ -1,7 +1,7 @@
 import React from "react";
 import { Form, Input, Typography, Row, Col } from "antd";
 import { PhoneOutlined } from "@ant-design/icons";
-import styles from "../../../app/register/page.module.css";
+import styles from "../../../../app/register/page.module.css";
 import { FormData } from "../hooks/useRegister";
 
 const { Title, Text } = Typography;

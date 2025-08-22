@@ -1,7 +1,7 @@
 import React from "react";
 import { Form, Input, Typography } from "antd";
 import { MailOutlined, CheckCircleOutlined } from "@ant-design/icons";
-import styles from "../../../app/register/page.module.css";
+import styles from "../../../../app/register/page.module.css";
 
 const { Title, Text } = Typography;
 
