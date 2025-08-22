@@ -1,7 +1,7 @@
 import React from "react";
 import { Steps } from "antd";
 import { MailOutlined, UserOutlined, SafetyOutlined } from "@ant-design/icons";
-import styles from "../../../app/register/page.module.css";
+import styles from "../../../../app/register/page.module.css";
 
 interface StepIndicatorProps {
   current: number;

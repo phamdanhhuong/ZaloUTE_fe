@@ -5,7 +5,7 @@ import { StepIndicator } from "./StepIndicator";
 import { EmailStep } from "./EmailStep";
 import { PersonalStep } from "./PersonalStep";
 import { OTPStep } from "./OTPStep";
-import styles from "../../../app/register/page.module.css";
+import styles from "../../../../app/register/page.module.css";
 
 interface RegisterFormProps {
   onStepChange?: (step: CurrentStep) => void;

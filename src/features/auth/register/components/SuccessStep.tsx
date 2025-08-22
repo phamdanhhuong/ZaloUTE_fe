@@ -1,7 +1,7 @@
 import React from "react";
 import { Result, Button } from "antd";
 import { CheckCircleOutlined } from "@ant-design/icons";
-import styles from "../../../app/register/page.module.css";
+import styles from "../../../../app/register/page.module.css";
 
 interface SuccessStepProps {
   onContinue?: () => void;

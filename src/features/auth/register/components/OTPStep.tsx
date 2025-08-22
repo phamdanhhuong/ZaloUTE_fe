@@ -1,6 +1,6 @@
 import React from "react";
 import { Form, Input, Button, Typography } from "antd";
-import styles from "../../../app/register/page.module.css";
+import styles from "../../../../app/register/page.module.css";
 
 const { Title, Text } = Typography;
 
