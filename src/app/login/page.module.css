@@ -30,6 +30,23 @@
   font-size: 14px;
 }
 
+.forgotPassword {
+  text-align: center;
+  margin: 16px 0;
+}
+
+.forgotPasswordLink {
+  color: #1890ff;
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+
+.forgotPasswordLink:hover {
+  color: #40a9ff;
+  text-decoration: underline;
+}
+
 .footer {
   text-align: center;
   margin-top: 16px;

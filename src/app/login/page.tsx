@@ -22,6 +22,12 @@ export default function LoginPage() {
 
         <LoginForm />
 
+        <div className={styles.forgotPassword}>
+          <Link href="/forgot-password" className={styles.forgotPasswordLink}>
+            Quên mật khẩu?
+          </Link>
+        </div>
+
         <div className={styles.footer}>
           <Text className={styles.footerText}>Chưa có tài khoản? </Text>
           <Link href="/register" className={styles.footerLink}>
