@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, Typography } from "antd";
 import Link from "next/link";
-import { LoginForm } from "@/features/login";
+import { LoginForm } from "@/features/auth/login";
 import styles from "./page.module.css";
 
 const { Title, Text } = Typography;
