@@ -1,17 +1,33 @@
 import { useState } from "react";
 import { message } from "antd";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { loginSuccess, setLoading } from "@/store/slices/userSlice";
+import { selectUserLoading } from "@/store/selectors";
 import { login, type LoginRequest, type LoginResponse } from "../service";
 
 export const useLogin = () => {
-  const [loading, setLoading] = useState(false);
+  const dispatch = useAppDispatch();
+  const loading = useAppSelector(selectUserLoading);
 
   const handleLogin = async (values: LoginRequest) => {
-    setLoading(true);
+    dispatch(setLoading(true));
     try {
       const data: LoginResponse = await login(values);
+
+      // Save to localStorage and Redux
       if (typeof window !== "undefined") {
         localStorage.setItem("token", data.accessToken);
+        localStorage.setItem("user", JSON.stringify(data.user));
       }
+
+      // Update Redux state
+      dispatch(
+        loginSuccess({
+          user: data.user,
+          token: data.accessToken,
+        })
+      );
+
       message.success("Đăng nhập thành công!");
       return data;
     } catch (err: any) {
@@ -19,11 +35,9 @@ export const useLogin = () => {
       message.error(msg);
       throw err;
     } finally {
-      setLoading(false);
+      dispatch(setLoading(false));
     }
   };
 
   return { loading, handleLogin };
 };
-
-
