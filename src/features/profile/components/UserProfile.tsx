@@ -1,12 +1,18 @@
 import React from "react";
 import { Avatar, Card, Button, Space, Typography } from "antd";
-import { UserOutlined, LogoutOutlined } from "@ant-design/icons";
+import {
+  UserOutlined,
+  LogoutOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
 import { useAuth } from "@/store/hooks";
+import { useProfile } from "../hooks";
 
 const { Text, Title } = Typography;
 
 export const UserProfile: React.FC = () => {
   const { user, userFullName, isAuthenticated, logout } = useAuth();
+  const { refreshing, refreshProfile } = useProfile();
 
   if (!isAuthenticated || !user) {
     return null;
@@ -17,6 +23,15 @@ export const UserProfile: React.FC = () => {
       title="Thông tin người dùng"
       style={{ maxWidth: 400, margin: "20px auto" }}
       actions={[
+        <Button
+          key="refresh"
+          type="default"
+          icon={<ReloadOutlined />}
+          onClick={refreshProfile}
+          loading={refreshing}
+        >
+          Làm mới
+        </Button>,
         <Button
           key="logout"
           type="primary"
