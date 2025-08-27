@@ -1,30 +1,27 @@
 "use client";
 
-import React from "react";
-import { List, Avatar, Button, Card, Empty, Spin, Badge } from "antd";
-import { 
-  UserOutlined, 
-  UserAddOutlined, 
-  TeamOutlined, 
-  CloseOutlined,
-  CheckOutlined,
-  UserDeleteOutlined
-} from "@ant-design/icons";
-import { useFriendRequest } from "../hooks";
-import type { FriendRequest, User } from "../service";
+import React, { useState } from "react";
+import { Avatar, Button, Empty, Spin } from "antd";
+import { CheckOutlined, CloseOutlined } from "@ant-design/icons";
+import type { User } from "../service";
+import { useFriendRequests } from "../hooks";
+import styles from "./FriendRequests.module.css";
 
 interface FriendRequestsProps {
-  onViewProfile?: (user: User) => void;
+  onAcceptRequest?: (friendshipId: string) => void;
+  onRejectRequest?: (friendshipId: string) => void;
 }
 
-export const FriendRequests: React.FC<FriendRequestsProps> = ({ onViewProfile }) => {
-  const {
-    loading,
-    sentRequests,
-    receivedRequests,
-    handleAcceptRequest,
-    handleRejectRequest,
-  } = useFriendRequest();
+export const FriendRequests: React.FC<FriendRequestsProps> = ({
+  onAcceptRequest: onAcceptCallback,
+  onRejectRequest: onRejectCallback,
+}) => {
+  const { loading, requests, handleAcceptRequest, handleRejectRequest } =
+    useFriendRequests();
+
+  const [processingRequests, setProcessingRequests] = useState<Set<string>>(
+    new Set()
+  );
 
   const getDisplayName = (user: User) => {
     return `${user.firstname} ${user.lastname}`.trim() || user.username;
@@ -37,329 +34,129 @@ export const FriendRequests: React.FC<FriendRequestsProps> = ({ onViewProfile })
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) return "Hôm qua";
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    return date.toLocaleDateString("vi-VN");
   };
 
-  // Navigation Menu
-  const NavMenu = () => (
-    <div style={{ padding: 16, borderBottom: "1px solid #e5e7eb" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: 8,
-            borderRadius: 8,
-            cursor: "pointer",
-            transition: "background-color 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f9fafb")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-        >
-          <TeamOutlined style={{ width: 20, height: 20, color: "#6b7280" }} />
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#111827" }}>
-            Danh sách bạn bè
-          </span>
-        </div>
+  const handleAccept = async (friendshipId: string) => {
+    setProcessingRequests((prev) => new Set(prev).add(friendshipId));
+    try {
+      await handleAcceptRequest(friendshipId);
+      onAcceptCallback?.(friendshipId);
+    } catch (error) {
+      // Error handled in hook
+    } finally {
+      setProcessingRequests((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(friendshipId);
+        return newSet;
+      });
+    }
+  };
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: 8,
-            borderRadius: 8,
-            cursor: "pointer",
-            transition: "background-color 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f9fafb")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-        >
-          <TeamOutlined style={{ width: 20, height: 20, color: "#6b7280" }} />
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#111827" }}>
-            Danh sách nhóm và cộng đồng
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: 8,
-            backgroundColor: "#dbeafe",
-            borderRadius: 8,
-            cursor: "pointer",
-          }}
-        >
-          <UserAddOutlined style={{ width: 20, height: 20, color: "#0084ff" }} />
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#0084ff" }}>
-            Lời mời kết bạn
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: 8,
-            borderRadius: 8,
-            cursor: "pointer",
-            transition: "background-color 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f9fafb")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-        >
-          <TeamOutlined style={{ width: 20, height: 20, color: "#6b7280" }} />
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#111827" }}>
-            Lời mời vào nhóm và cộng đồng
-          </span>
-        </div>
-      </div>
-    </div>
-  );
+  const handleReject = async (friendshipId: string) => {
+    setProcessingRequests((prev) => new Set(prev).add(friendshipId));
+    try {
+      await handleRejectRequest(friendshipId);
+      onRejectCallback?.(friendshipId);
+    } catch (error) {
+      // Error handled in hook
+    } finally {
+      setProcessingRequests((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(friendshipId);
+        return newSet;
+      });
+    }
+  };
 
   if (loading) {
     return (
-      <div>
-        <NavMenu />
-        <div style={{ textAlign: "center", padding: "40px 0" }}>
-          <Spin tip="Đang tải..." />
-        </div>
+      <div className={styles.loadingContainer}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (requests.length === 0) {
+    return (
+      <div className={styles.friendRequestsContainer}>
+        <Empty
+          description="Không có lời mời kết bạn nào"
+          className={styles.emptyContainer}
+        />
       </div>
     );
   }
 
   return (
-    <div>
-      <NavMenu />
-      
-      <div style={{ padding: 16 }}>
-        {/* Received Friend Requests */}
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 500, color: "#6b7280", marginBottom: 12 }}>
-            Lời mời đã nhận ({receivedRequests.length})
-          </h3>
+    <div className={styles.friendRequestsContainer}>
+      <div className={styles.header}>
+        <h3 className={styles.headerTitle}>
+          Lời mời kết bạn ({requests.length})
+        </h3>
+      </div>
 
-          {receivedRequests.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {receivedRequests.map((request) => (
-                <Card
-                  key={request.id}
-                  size="small"
-                  style={{ backgroundColor: "#f9fafb" }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                    <Avatar 
-                      size={48} 
-                      style={{ backgroundColor: "#0084ff" }}
-                    >
-                      {getAvatarText(request.sender)}
-                    </Avatar>
-
-                    <div style={{ flex: 1 }}>
-                      <div style={{ 
-                        display: "flex", 
-                        alignItems: "center", 
-                        justifyContent: "space-between",
-                        marginBottom: 4 
-                      }}>
-                        <h4 style={{ margin: 0, fontWeight: 500, color: "#111827" }}>
-                          {getDisplayName(request.sender)}
-                        </h4>
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<CloseOutlined />}
-                          onClick={() => handleRejectRequest(request.id)}
-                          style={{ width: 24, height: 24 }}
-                        />
-                      </div>
-
-                      <p style={{ 
-                        fontSize: 12, 
-                        color: "#6b7280", 
-                        marginBottom: 8 
-                      }}>
-                        {formatDate(request.createdAt)} - Từ tìm kiếm
-                      </p>
-
-                      <p style={{ 
-                        fontSize: 14, 
-                        color: "#374151", 
-                        marginBottom: 12 
-                      }}>
-                        Muốn kết bạn với bạn
-                      </p>
-
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <Button
-                          style={{ 
-                            flex: 1, 
-                            backgroundColor: "transparent",
-                            color: "#6b7280",
-                            borderColor: "#d1d5db" 
-                          }}
-                          onClick={() => handleRejectRequest(request.id)}
-                          icon={<UserDeleteOutlined />}
-                        >
-                          Từ chối
-                        </Button>
-                        <Button
-                          type="primary"
-                          style={{ flex: 1 }}
-                          onClick={() => handleAcceptRequest(request.id)}
-                          icon={<CheckOutlined />}
-                        >
-                          Đồng ý
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Empty 
-              description="Không có lời mời kết bạn nào"
-              style={{ padding: "20px 0" }}
-            />
-          )}
-        </div>
-
-        {/* Sent Friend Requests */}
-        {sentRequests.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 500, color: "#6b7280", marginBottom: 12 }}>
-              Lời mời đã gửi ({sentRequests.length})
-            </h3>
-
-            <List
-              dataSource={sentRequests}
-              renderItem={(request) => (
-                <List.Item
-                  actions={[
-                    onViewProfile && (
-                      <Button
-                        key="profile"
-                        type="text"
-                        icon={<UserOutlined />}
-                        onClick={() => onViewProfile(request.receiver)}
-                        size="small"
-                      >
-                        Xem hồ sơ
-                      </Button>
-                    ),
-                  ].filter(Boolean)}
-                >
-                  <List.Item.Meta
-                    avatar={
-                      <Badge 
-                        count="Đã gửi" 
-                        style={{ backgroundColor: "#faad14" }}
-                        offset={[-5, 5]}
-                      >
-                        <Avatar size={40} style={{ backgroundColor: "#0084ff" }}>
-                          {getAvatarText(request.receiver)}
-                        </Avatar>
-                      </Badge>
-                    }
-                    title={getDisplayName(request.receiver)}
-                    description={
-                      <div>
-                        <div>@{request.receiver.username}</div>
-                        <div style={{ fontSize: 12, color: "#666" }}>
-                          Gửi lúc: {formatDate(request.createdAt)}
-                        </div>
-                      </div>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
-          </div>
-        )}
-
-        {/* Suggested Friends - Mock data for demo */}
-        <div>
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "space-between",
-            marginBottom: 12 
-          }}>
-            <h3 style={{ fontSize: 14, fontWeight: 500, color: "#6b7280", margin: 0 }}>
-              Gợi ý kết bạn (2)
-            </h3>
-            <Button 
-              type="text" 
-              style={{ color: "#0084ff" }}
-              size="small"
-            >
-              Xem tất cả →
-            </Button>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[
-              { id: "1", name: "Nguyễn Văn A", username: "nguyenvana", mutualFriends: 5 },
-              { id: "2", name: "Trần Thị B", username: "tranthib", mutualFriends: 3 },
-            ].map((suggestion) => (
-              <div
-                key={suggestion.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: 12,
-                  borderRadius: 8,
-                  transition: "background-color 0.2s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f9fafb")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+      <div>
+        {requests.map((request) => (
+          <div key={request.friendshipId} className={styles.requestItem}>
+            <div className={styles.userInfo}>
+              <Avatar
+                size={48}
+                className={styles.avatar}
+                style={{ backgroundColor: "#1890ff" }}
               >
-                <Avatar size={40} style={{ backgroundColor: "#d1d5db", color: "#6b7280" }}>
-                  {suggestion.name.charAt(0)}
-                </Avatar>
+                {getAvatarText(request.requester)}
+              </Avatar>
 
-                <div style={{ flex: 1 }}>
-                  <h4 style={{ 
-                    margin: "0 0 4px 0", 
-                    fontSize: 14, 
-                    fontWeight: 500, 
-                    color: "#111827" 
-                  }}>
-                    {suggestion.name}
-                  </h4>
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
-                    {suggestion.mutualFriends} bạn chung
-                  </p>
+              <div className={styles.userDetails}>
+                <div className={styles.userName}>
+                  {getDisplayName(request.requester)}
                 </div>
-
-                <Button
-                  size="small"
-                  style={{
-                    color: "#0084ff",
-                    borderColor: "#0084ff",
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  Kết bạn
-                </Button>
+                <div className={styles.username}>
+                  @{request.requester.username}
+                </div>
+                <div className={styles.requestDate}>
+                  Gửi lời mời {formatDate(request.createdAt)}
+                </div>
               </div>
-            ))}
+            </div>
+
+            <div className={styles.actionButtons}>
+              <Button
+                type="primary"
+                icon={<CheckOutlined />}
+                size="small"
+                loading={processingRequests.has(request.friendshipId)}
+                disabled={processingRequests.has(request.friendshipId)}
+                onClick={() => handleAccept(request.friendshipId)}
+                className={styles.acceptButton}
+              >
+                Chấp nhận
+              </Button>
+
+              <Button
+                danger
+                icon={<CloseOutlined />}
+                size="small"
+                loading={processingRequests.has(request.friendshipId)}
+                disabled={processingRequests.has(request.friendshipId)}
+                onClick={() => handleReject(request.friendshipId)}
+                className={styles.rejectButton}
+              >
+                Từ chối
+              </Button>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );
 };
 
 export default FriendRequests;
-

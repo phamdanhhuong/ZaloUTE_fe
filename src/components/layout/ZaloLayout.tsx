@@ -2,14 +2,15 @@
 
 import React, { useState } from "react";
 import { Button, Avatar } from "antd";
-import { 
-  MessageOutlined, 
-  TeamOutlined, 
-  UserAddOutlined, 
-  CloudOutlined, 
-  PhoneOutlined, 
+import {
+  MessageOutlined,
+  TeamOutlined,
+  UserAddOutlined,
+  CloudOutlined,
+  PhoneOutlined,
   SettingOutlined,
-  UserOutlined
+  UserOutlined,
+  ContactsOutlined,
 } from "@ant-design/icons";
 import { useAppSelector } from "@/store/hooks";
 import { selectUser } from "@/store/selectors";
@@ -17,23 +18,40 @@ import "../../app/styles/zalo-layout.css";
 
 // Import components
 import { ConversationList, ChatArea } from "@/features/chat";
-import { FriendsList, FriendRequests, UserSearch, UserProfile } from "@/features/friend";
+import {
+  Friend,
+  UserSearch,
+  ListFriend,
+  useFriends,
+  FriendRequests,
+  useFriendRequests,
+} from "@/features/friend";
 import type { Conversation } from "@/features/chat/service";
 import type { User } from "@/features/friend/service";
 
-type ActiveView = "chat" | "friends" | "friend-requests" | "groups";
+type ActiveView = "chat" | "friends" | "friend-list" | "groups";
+type FriendTab = "friends" | "groups" | "friend-requests" | "group-invites";
 
 export const ZaloLayout: React.FC = () => {
   const [activeView, setActiveView] = useState<ActiveView>("chat");
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | undefined>();
+  const [selectedConversation, setSelectedConversation] = useState<
+    Conversation | undefined
+  >();
   const [selectedUser, setSelectedUser] = useState<User | undefined>();
   const [showUserProfile, setShowUserProfile] = useState(false);
-  
+  const [selectedFriendTab, setSelectedFriendTab] =
+    useState<FriendTab>("friends");
+
   const currentUser = useAppSelector(selectUser);
+  const { loading, friends } = useFriends();
+  const { requests: friendRequests, loadPendingRequests } = useFriendRequests();
 
   const getUserDisplayName = () => {
     if (!currentUser) return "User";
-    return `${currentUser.firstname} ${currentUser.lastname}`.trim() || currentUser.username;
+    return (
+      `${currentUser.firstname} ${currentUser.lastname}`.trim() ||
+      currentUser.username
+    );
   };
 
   const getUserAvatar = () => {
@@ -57,44 +75,69 @@ export const ZaloLayout: React.FC = () => {
     setShowUserProfile(true);
   };
 
+  const handleFriendTabChange = (tab: FriendTab) => {
+    setSelectedFriendTab(tab);
+    setShowUserProfile(false); // Hide profile when changing tabs
+  };
+
   const renderMainContent = () => {
-    if (showUserProfile) {
-      return (
-        <UserProfile
-          user={selectedUser}
-          onStartChat={handleChatWithFriend}
-          onClose={() => {
-            setShowUserProfile(false);
-            setSelectedUser(undefined);
-          }}
-        />
-      );
+    if (showUserProfile && selectedUser) {
     }
 
     switch (activeView) {
       case "chat":
-        return (
-          <ChatArea 
-            conversation={selectedConversation}
-            currentUser={currentUser}
-          />
-        );
+        return <ChatArea conversation={selectedConversation} />;
+      case "friends":
+        return renderFriendTabContent();
+      default:
+        return <div className="empty-state">Chọn một mục để bắt đầu</div>;
+    }
+  };
+
+  const renderFriendTabContent = () => {
+    switch (selectedFriendTab) {
       case "friends":
         return (
-          <div className="empty-state">
-            Chọn một người bạn để xem thông tin
+          <ListFriend
+            friends={friends}
+            loading={loading}
+            onChatWithFriend={handleChatWithFriend}
+            onViewProfile={handleViewProfile}
+          />
+        );
+      case "groups":
+        return (
+          <div style={{ padding: 20, textAlign: "center" }}>
+            <h3>Danh sách nhóm và cộng đồng</h3>
+            <p>Tính năng này sẽ được phát triển trong tương lai</p>
           </div>
         );
       case "friend-requests":
         return (
-          <div className="empty-state">
-            Quản lý lời mời kết bạn
+          <FriendRequests
+            onAcceptRequest={(requestId) => {
+              console.log("Accepted friend request:", requestId);
+              // Refresh friend requests and friends list
+              loadPendingRequests();
+            }}
+            onRejectRequest={(requestId) => {
+              console.log("Rejected friend request:", requestId);
+              // Refresh friend requests
+              loadPendingRequests();
+            }}
+          />
+        );
+      case "group-invites":
+        return (
+          <div style={{ padding: 20, textAlign: "center" }}>
+            <h3>Lời mời vào nhóm và cộng đồng</h3>
+            <p>Tính năng này sẽ được phát triển trong tương lai</p>
           </div>
         );
       default:
         return (
-          <div className="empty-state">
-            Chọn một mục để bắt đầu
+          <div style={{ padding: 20, textAlign: "center" }}>
+            Chọn một mục từ menu bên trái
           </div>
         );
     }
@@ -107,19 +150,16 @@ export const ZaloLayout: React.FC = () => {
           <ConversationList
             activeConversationId={selectedConversation?.id}
             onConversationSelect={setSelectedConversation}
-            currentUser={currentUser}
           />
         );
       case "friends":
         return (
-          <FriendsList
+          <Friend
             onChatWithFriend={handleChatWithFriend}
             onViewProfile={handleViewProfile}
+            onTabChange={handleFriendTabChange}
+            activeTab={selectedFriendTab}
           />
-        );
-      case "friend-requests":
-        return (
-          <FriendRequests onViewProfile={handleViewProfile} />
         );
       default:
         return <div>Chọn một mục từ sidebar</div>;
@@ -146,23 +186,22 @@ export const ZaloLayout: React.FC = () => {
             icon={<MessageOutlined />}
           />
 
-          <Button
-            className={`nav-button ${activeView === "friends" ? "active" : ""}`}
-            onClick={() => {
-              setActiveView("friends");
-              setShowUserProfile(false);
-            }}
-            icon={<TeamOutlined />}
-          />
-
-          <Button
-            className={`nav-button ${activeView === "friend-requests" ? "active" : ""}`}
-            onClick={() => {
-              setActiveView("friend-requests");
-              setShowUserProfile(false);
-            }}
-            icon={<UserAddOutlined />}
-          />
+          <div className="nav-button-wrapper">
+            <Button
+              className={`nav-button ${
+                activeView === "friends" ? "active" : ""
+              }`}
+              onClick={() => {
+                setActiveView("friends");
+                setShowUserProfile(false);
+              }}
+              icon={<ContactsOutlined />}
+            />
+            {/* Notification badge for friend requests */}
+            {friendRequests.length > 0 && (
+              <div className="notification-badge">{friendRequests.length}</div>
+            )}
+          </div>
         </div>
 
         {/* Bottom Icons */}
@@ -183,18 +222,12 @@ export const ZaloLayout: React.FC = () => {
               <h1 className="title-text">
                 {activeView === "chat" && `Zalo - ${getUserDisplayName()}`}
                 {activeView === "friends" && "Danh sách bạn bè"}
-                {activeView === "friend-requests" && "Lời mời kết bạn"}
               </h1>
               <div className="header-actions">
-                <Button 
-                  className="header-action-btn" 
-                  icon={<TeamOutlined />}
-                  onClick={() => setActiveView("friends")}
-                />
-                <Button 
-                  className="header-action-btn" 
+                <Button className="header-action-btn" icon={<TeamOutlined />} />
+                <Button
+                  className="header-action-btn"
                   icon={<UserAddOutlined />}
-                  onClick={() => setActiveView("friend-requests")}
                 />
               </div>
             </div>
@@ -208,15 +241,11 @@ export const ZaloLayout: React.FC = () => {
           </div>
 
           {/* Content based on active view */}
-          <div className="sidebar-content">
-            {renderSidebarContent()}
-          </div>
+          <div className="sidebar-content">{renderSidebarContent()}</div>
         </div>
 
         {/* Chat Area */}
-        <div className="chat-area">
-          {renderMainContent()}
-        </div>
+        <div className="chat-area">{renderMainContent()}</div>
       </div>
     </div>
   );

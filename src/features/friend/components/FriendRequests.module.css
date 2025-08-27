@@ -1,0 +1,116 @@
+.friendRequestsContainer {
+  height: 100%;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+.header {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.headerTitle {
+  margin: 0;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+.emptyContainer {
+  margin-top: 50px;
+}
+
+.requestItem {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.requestItem:hover {
+  background-color: #f9fafb;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.avatar {
+  flex-shrink: 0;
+}
+
+.userDetails {
+  flex: 1;
+}
+
+.userName {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.username {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.requestDate {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.acceptButton {
+  background-color: #10b981 !important;
+  border-color: #10b981 !important;
+  color: white;
+}
+
+.acceptButton:hover {
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+}
+
+.rejectButton {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.rejectButton:hover {
+  background-color: #dc2626 !important;
+  color: white !important;
+}
+
+@media (max-width: 768px) {
+  .actionButtons {
+    justify-content: center;
+    margin-top: 12px;
+  }
+
+  .requestItem {
+    padding: 12px;
+  }
+
+  .userInfo {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+}

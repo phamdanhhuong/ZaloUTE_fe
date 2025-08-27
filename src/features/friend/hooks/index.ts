@@ -1,2 +1,7 @@
-export { useFriendSearch, useFriendRequest, useFriends, useUserProfile } from "./useFriend";
-
+export {
+  useFriendSearch,
+  useFriends,
+  useUserProfile,
+  useFriendRequests,
+  useSendFriendRequest,
+} from "./useFriend";

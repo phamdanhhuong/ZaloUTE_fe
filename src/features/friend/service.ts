@@ -6,30 +6,21 @@ export interface User {
   email: string;
   firstname: string;
   lastname: string;
-  phone: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  phone?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  friendsSince?: string; // For friends list
+  isFriend?: boolean; // For search results
+  friendshipStatus?: "pending" | "accepted" | "rejected" | null; // For search results
 }
 
+// Friend request interfaces based on new API
 export interface FriendRequest {
-  id: string;
-  senderId: string;
-  receiverId: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  friendshipId: string;
+  requester: User;
   createdAt: string;
-  updatedAt: string;
-  sender: User;
-  receiver: User;
-}
-
-export interface Friend {
-  id: string;
-  userId: string;
-  friendId: string;
-  createdAt: string;
-  user: User;
-  friend: User;
+  status: "pending" | "accepted" | "rejected";
 }
 
 export interface SearchUsersRequest {
@@ -40,26 +31,33 @@ export interface SearchUsersRequest {
 }
 
 export interface SearchUsersResponse {
-  users: User[];
-  total: number;
+  statusCode: number;
+  message: string;
+  data: User[];
 }
+
+// Type cho response thực tế từ API (trả về trực tiếp array)
+export type SearchUsersApiResponse = User[];
 
 export interface SendFriendRequestRequest {
   receiverId: string;
 }
 
-export interface GetFriendRequestsResponse {
-  sent: FriendRequest[];
-  received: FriendRequest[];
+export interface RespondToFriendRequestRequest {
+  friendshipId: string;
+  action: "accept" | "reject";
 }
 
 // Tìm kiếm người dùng
 export const searchUsers = async (
   params: SearchUsersRequest
-): Promise<SearchUsersResponse> => {
+): Promise<SearchUsersApiResponse> => {
   try {
-    const response = await axiosClient.get("/user/search", { params });
-    return response as SearchUsersResponse;
+    const response: SearchUsersApiResponse = await axiosClient.get(
+      "/user/search",
+      { params }
+    );
+    return response;
   } catch (error) {
     console.error("Search users failed:", error);
     throw error;
@@ -69,32 +67,54 @@ export const searchUsers = async (
 // Gửi lời mời kết bạn
 export const sendFriendRequest = async (
   payload: SendFriendRequestRequest
-): Promise<FriendRequest> => {
+): Promise<{ message: string }> => {
   try {
-    const response = await axiosClient.post("/friend/request", payload);
-    return response as FriendRequest;
+    const response: { message: string } = await axiosClient.post(
+      "/user/friends/request",
+      payload
+    );
+    return response;
   } catch (error) {
     console.error("Send friend request failed:", error);
     throw error;
   }
 };
 
-// Lấy danh sách lời mời kết bạn
-export const getFriendRequests = async (): Promise<GetFriendRequestsResponse> => {
+// Lấy danh sách lời mời kết bạn đang pending
+export const getPendingFriendRequests = async (): Promise<FriendRequest[]> => {
   try {
-    const response = await axiosClient.get("/friend/requests");
-    return response as GetFriendRequestsResponse;
+    const response: FriendRequest[] = await axiosClient.get(
+      "/user/friends/requests"
+    );
+    return response;
   } catch (error) {
-    console.error("Get friend requests failed:", error);
+    console.error("Get pending friend requests failed:", error);
+    throw error;
+  }
+};
+
+// Phản hồi lời mời kết bạn (accept/reject)
+export const respondToFriendRequest = async (
+  payload: RespondToFriendRequestRequest
+): Promise<{ message: string }> => {
+  try {
+    const response: { message: string } = await axiosClient.post(
+      "/user/friends/respond",
+      payload
+    );
+    return response;
+  } catch (error) {
+    console.error("Respond to friend request failed:", error);
     throw error;
   }
 };
 
 // Chấp nhận lời mời kết bạn
-export const acceptFriendRequest = async (requestId: string): Promise<Friend> => {
+export const acceptFriendRequest = async (
+  friendshipId: string
+): Promise<{ message: string }> => {
   try {
-    const response = await axiosClient.put(`/friend/request/${requestId}/accept`);
-    return response as Friend;
+    return await respondToFriendRequest({ friendshipId, action: "accept" });
   } catch (error) {
     console.error("Accept friend request failed:", error);
     throw error;
@@ -102,9 +122,11 @@ export const acceptFriendRequest = async (requestId: string): Promise<Friend> =>
 };
 
 // Từ chối lời mời kết bạn
-export const rejectFriendRequest = async (requestId: string): Promise<void> => {
+export const rejectFriendRequest = async (
+  friendshipId: string
+): Promise<{ message: string }> => {
   try {
-    await axiosClient.put(`/friend/request/${requestId}/reject`);
+    return await respondToFriendRequest({ friendshipId, action: "reject" });
   } catch (error) {
     console.error("Reject friend request failed:", error);
     throw error;
@@ -112,10 +134,10 @@ export const rejectFriendRequest = async (requestId: string): Promise<void> => {
 };
 
 // Lấy danh sách bạn bè
-export const getFriends = async (): Promise<Friend[]> => {
+export const getFriends = async (): Promise<User[]> => {
   try {
-    const response = await axiosClient.get("/friend/list");
-    return response as Friend[];
+    const response: User[] = await axiosClient.get("/user/friends");
+    return response;
   } catch (error) {
     console.error("Get friends failed:", error);
     throw error;
@@ -125,7 +147,7 @@ export const getFriends = async (): Promise<Friend[]> => {
 // Hủy kết bạn
 export const removeFriend = async (friendId: string): Promise<void> => {
   try {
-    await axiosClient.delete(`/friend/${friendId}`);
+    await axiosClient.delete(`/user/friends/${friendId}`);
   } catch (error) {
     console.error("Remove friend failed:", error);
     throw error;
@@ -135,11 +157,10 @@ export const removeFriend = async (friendId: string): Promise<void> => {
 // Lấy hồ sơ người dùng
 export const getUserProfile = async (userId: string): Promise<User> => {
   try {
-    const response = await axiosClient.get(`/user/profile/${userId}`);
-    return response as User;
+    const response: User = await axiosClient.get(`/user/profile/${userId}`);
+    return response;
   } catch (error) {
     console.error("Get user profile failed:", error);
     throw error;
   }
 };
-

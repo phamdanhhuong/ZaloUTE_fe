@@ -2,14 +2,14 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Input, Button, Avatar, Empty, Spin } from "antd";
-import { 
-  SearchOutlined, 
-  TeamOutlined, 
-  PhoneOutlined, 
+import {
+  SearchOutlined,
+  TeamOutlined,
+  PhoneOutlined,
   PaperClipOutlined,
   SmileOutlined,
   SendOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import { useMessages, useMessageReactions } from "../hooks";
 import type { Conversation, Message } from "../service";
@@ -29,8 +29,13 @@ interface ChatAreaProps {
   currentUser?: User;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser }) => {
-  const { loading, messages, handleSendMessage } = useMessages(conversation?.id);
+export const ChatArea: React.FC<ChatAreaProps> = ({
+  conversation,
+  currentUser,
+}) => {
+  const { loading, messages, handleSendMessage } = useMessages(
+    conversation?.id
+  );
   const { handleAddReaction } = useMessageReactions();
   const [messageInput, setMessageInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -46,7 +51,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
 
   const getConversationName = () => {
     if (!conversation) return "";
-    
+
     if (conversation.name) {
       return conversation.name;
     }
@@ -56,9 +61,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
     }
 
     const otherParticipant = conversation.participants.find(
-      p => p.user.id !== currentUser?.id
+      (p) => p.user.id !== currentUser?.id
     );
-    
+
     if (otherParticipant) {
       const user = otherParticipant.user;
       return `${user.firstname} ${user.lastname}`.trim() || user.username;
@@ -124,7 +129,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
   if (!conversation) {
     return (
       <div className={styles.emptyState}>
-        <Empty 
+        <Empty
           description="Chọn một cuộc trò chuyện để bắt đầu nhắn tin"
           style={{ color: "#6b7280", fontSize: 16 }}
         />
@@ -160,21 +165,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
           </div>
 
           <div className={styles.headerActions}>
-            <Button 
-              type="text" 
-              size="small" 
+            <Button
+              type="text"
+              size="small"
               icon={<TeamOutlined />}
               className={styles.actionButton}
             />
-            <Button 
-              type="text" 
-              size="small" 
+            <Button
+              type="text"
+              size="small"
               icon={<PhoneOutlined />}
               className={styles.actionButton}
             />
-            <Button 
-              type="text" 
-              size="small" 
+            <Button
+              type="text"
+              size="small"
               icon={<SearchOutlined />}
               className={styles.actionButton}
             />
@@ -186,7 +191,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
       <div className={styles.messagesArea}>
         {loading ? (
           <div className={styles.loadingContainer}>
-            <Spin tip="Đang tải tin nhắn..." />
+            <Spin size="large">
+              <div style={{ padding: "20px", textAlign: "center" }}>
+                Đang tải tin nhắn...
+              </div>
+            </Spin>
           </div>
         ) : messages.length > 0 ? (
           <div className={styles.messagesContainer}>
@@ -206,11 +215,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
                     </span>
                   </div>
 
-                  <div className={`${styles.messageBubble} ${message.sender.id === currentUser?.id ? styles.highlighted : ''}`}>
+                  <div
+                    className={`${styles.messageBubble} ${
+                      message.sender.id === currentUser?.id
+                        ? styles.highlighted
+                        : ""
+                    }`}
+                  >
                     {message.messageType === "text" ? (
-                      <p className={styles.messageText}>
-                        {message.content}
-                      </p>
+                      <p className={styles.messageText}>{message.content}</p>
                     ) : (
                       <div className={styles.messageTypeInfo}>
                         {message.messageType === "image" && "📷 Hình ảnh"}
@@ -229,7 +242,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
                           <span className={styles.reactionCount}>1</span>
                         </div>
                       ))}
-                      
+
                       {/* Add reaction button */}
                       <div
                         className={styles.reaction}
@@ -254,15 +267,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
         <div className={styles.inputContainer}>
           {/* Input Tools */}
           <div className={styles.inputTools}>
-            <Button 
-              type="text" 
-              size="small" 
+            <Button
+              type="text"
+              size="small"
               icon={<PaperClipOutlined />}
               className={styles.actionButton}
             />
-            <Button 
-              type="text" 
-              size="small" 
+            <Button
+              type="text"
+              size="small"
               icon={<SmileOutlined />}
               className={styles.actionButton}
             />
@@ -284,7 +297,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation, currentUser })
               icon={messageInput.trim() ? <SendOutlined /> : <SmileOutlined />}
               onClick={messageInput.trim() ? handleSend : undefined}
               loading={sending}
-              className={`${styles.sendButton} ${messageInput.trim() ? styles.active : styles.inactive}`}
+              className={`${styles.sendButton} ${
+                messageInput.trim() ? styles.active : styles.inactive
+              }`}
             />
           </div>
         </div>

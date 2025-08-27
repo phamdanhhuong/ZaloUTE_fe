@@ -978,7 +978,7 @@
   .chat-list-sidebar {
     width: 280px;
   }
-  
+
   .chat-name {
     max-width: 150px;
   }
@@ -988,21 +988,49 @@
   .zalo-container {
     flex-direction: column;
   }
-  
+
   .left-sidebar {
     width: 100%;
     height: 60px;
     flex-direction: row;
     padding: 8px 16px;
   }
-  
+
   .nav-icons,
   .bottom-icons {
     flex-direction: row;
   }
-  
+
   .chat-list-sidebar {
     width: 100%;
   }
 }
 
+/* Notification Badge */
+.nav-button-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: #f56565;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  border: 2px solid #0084ff;
+}
+
+.notification-badge.small {
+  width: 8px;
+  height: 8px;
+  font-size: 0;
+}

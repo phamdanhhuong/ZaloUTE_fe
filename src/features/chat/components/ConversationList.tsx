@@ -2,7 +2,11 @@
 
 import React, { useState } from "react";
 import { List, Avatar, Badge, Input, Button, Empty, Spin } from "antd";
-import { SearchOutlined, TeamOutlined, PushpinOutlined } from "@ant-design/icons";
+import {
+  SearchOutlined,
+  TeamOutlined,
+  PushpinOutlined,
+} from "@ant-design/icons";
 import { useConversations } from "../hooks";
 import type { Conversation } from "../service";
 import styles from "./ConversationList.module.css";
@@ -42,9 +46,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
     // For 1-on-1 conversation, get the other participant's name
     const otherParticipant = conversation.participants.find(
-      p => p.user.id !== currentUser?.id
+      (p) => p.user.id !== currentUser?.id
     );
-    
+
     if (otherParticipant) {
       const user = otherParticipant.user;
       return `${user.firstname} ${user.lastname}`.trim() || user.username;
@@ -61,7 +65,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    const diffInMinutes = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60)
+    );
 
     if (diffInMinutes < 1) {
       return "Vừa xong";
@@ -84,7 +90,10 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     }
 
     const { content, sender, messageType } = conversation.lastMessage;
-    const senderName = sender.id === currentUser?.id ? "Bạn" : sender.firstname || sender.username;
+    const senderName =
+      sender.id === currentUser?.id
+        ? "Bạn"
+        : sender.firstname || sender.username;
 
     switch (messageType) {
       case "image":
@@ -104,7 +113,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
     // Filter by search text
     if (searchText) {
-      filtered = filtered.filter(conv => {
+      filtered = filtered.filter((conv) => {
         const name = getConversationName(conv).toLowerCase();
         return name.includes(searchText.toLowerCase());
       });
@@ -112,7 +121,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
     // Filter by tab
     if (activeTab === "unread") {
-      filtered = filtered.filter(conv => (conv.unreadCount || 0) > 0);
+      filtered = filtered.filter((conv) => (conv.unreadCount || 0) > 0);
     }
 
     // Sort by last message time
@@ -132,16 +141,16 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             Zalo - {currentUser?.firstname || "Người dùng"}
           </h1>
           <div className={styles.headerActions}>
-            <Button 
-              type="text" 
-              size="small" 
-              icon={<TeamOutlined />} 
+            <Button
+              type="text"
+              size="small"
+              icon={<TeamOutlined />}
               className={styles.actionButton}
             />
-            <Button 
-              type="text" 
-              size="small" 
-              icon={<SearchOutlined />} 
+            <Button
+              type="text"
+              size="small"
+              icon={<SearchOutlined />}
               className={styles.actionButton}
             />
           </div>
@@ -160,13 +169,17 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       {/* Tabs */}
       <div className={styles.tabs}>
         <button
-          className={`${styles.tab} ${activeTab === "all" ? styles.active : ""}`}
+          className={`${styles.tab} ${
+            activeTab === "all" ? styles.active : ""
+          }`}
           onClick={() => setActiveTab("all")}
         >
           Tất cả
         </button>
         <button
-          className={`${styles.tab} ${activeTab === "unread" ? styles.active : ""}`}
+          className={`${styles.tab} ${
+            activeTab === "unread" ? styles.active : ""
+          }`}
           onClick={() => setActiveTab("unread")}
         >
           Chưa đọc
@@ -177,23 +190,26 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       <div className={styles.listContainer}>
         {loading ? (
           <div className={styles.loadingContainer}>
-            <Spin tip="Đang tải cuộc trò chuyện..." />
+            <Spin size="large">
+              <div style={{ padding: "20px", textAlign: "center" }}>
+                Đang tải cuộc trò chuyện...
+              </div>
+            </Spin>
           </div>
         ) : filteredConversations.length > 0 ? (
           <div className={styles.scrollArea}>
             {filteredConversations.map((conversation) => (
               <div
                 key={conversation.id}
-                className={`${styles.conversationItem} ${activeConversationId === conversation.id ? styles.active : ""}`}
+                className={`${styles.conversationItem} ${
+                  activeConversationId === conversation.id ? styles.active : ""
+                }`}
                 onClick={() => onConversationSelect?.(conversation)}
               >
                 <div className={styles.conversationContent}>
                   {/* Avatar */}
                   <div className={styles.avatarContainer}>
-                    <Avatar 
-                      size={48} 
-                      className={styles.avatar}
-                    >
+                    <Avatar size={48} className={styles.avatar}>
                       {getConversationAvatar(conversation)}
                     </Avatar>
 
@@ -226,7 +242,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
                       <div className={styles.timeAndBadge}>
                         <span className={styles.time}>
-                          {conversation.lastMessage ? formatTime(conversation.lastMessage.createdAt) : ""}
+                          {conversation.lastMessage
+                            ? formatTime(conversation.lastMessage.createdAt)
+                            : ""}
                         </span>
                         {(conversation.unreadCount || 0) > 0 && (
                           <Badge
@@ -247,13 +265,13 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             ))}
           </div>
         ) : (
-          <Empty 
+          <Empty
             description={
-              searchText 
-                ? "Không tìm thấy cuộc trò chuyện nào" 
-                : activeTab === "unread" 
-                  ? "Không có tin nhắn chưa đọc"
-                  : "Chưa có cuộc trò chuyện nào"
+              searchText
+                ? "Không tìm thấy cuộc trò chuyện nào"
+                : activeTab === "unread"
+                ? "Không có tin nhắn chưa đọc"
+                : "Chưa có cuộc trò chuyện nào"
             }
             className={styles.emptyState}
           />
