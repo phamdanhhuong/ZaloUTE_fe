@@ -1,0 +1,126 @@
+/* FriendsList Styles */
+
+.container {
+  /* Container chính */
+}
+
+/* Header */
+.header {
+  margin-bottom: 16px;
+}
+
+.title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.searchContainer {
+  margin-bottom: 12px;
+}
+
+.searchInput {
+  margin-bottom: 8px;
+}
+
+.filterControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filterSelect {
+  width: 140px;
+}
+
+.resultCount {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Friends List */
+.loadingContainer {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.scrollContainer {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.groupSection {
+  /* Phần nhóm cho từng chữ cái */
+}
+
+.sectionHeader {
+  padding: 8px 0;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #f0f0f0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.friendItem {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.friendItem:hover {
+  background-color: #f9fafb;
+}
+
+.friendAvatar {
+  background-color: #0084ff !important;
+  color: white !important;
+}
+
+.friendActions {
+  display: flex;
+  gap: 8px;
+}
+
+.actionButton {
+  font-size: 12px;
+  padding: 4px 8px;
+  height: auto;
+  border-radius: 4px;
+}
+
+.actionButton.chat {
+  border-color: #0084ff;
+  color: #0084ff;
+}
+
+.actionButton.chat:hover {
+  background-color: #dbeafe;
+}
+
+.actionButton.profile {
+  border-color: #6b7280;
+  color: #6b7280;
+}
+
+.actionButton.profile:hover {
+  background-color: #f3f4f6;
+}
+
+.actionButton.remove {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.actionButton.remove:hover {
+  background-color: #fef2f2;
+}
+
