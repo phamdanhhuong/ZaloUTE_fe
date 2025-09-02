@@ -61,22 +61,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
       console.log('Setting active conversation:', conversation._id);
       dispatch(setActiveConversationId(conversation._id));
       
-      // Only call socket operations if connected
-      if (isConnected) {
-        console.log('Joining conversation and loading messages for:', conversation._id);
-        joinConversation(conversation._id);
-        getMessages({ conversationId: conversation._id, limit: 50 });
-      }
+      // Use async functions properly
+      const initializeConversation = async () => {
+        try {
+          console.log('Joining conversation and loading messages for:', conversation._id);
+          await joinConversation(conversation._id);
+          await getMessages({ conversationId: conversation._id, limit: 50 });
+        } catch (error) {
+          console.error('Failed to initialize conversation:', error);
+        }
+      };
+
+      initializeConversation();
     }
-  }, [conversation, activeConversationId, isConnected, dispatch, joinConversation, getMessages]);
+  }, [conversation, activeConversationId, dispatch, joinConversation, getMessages]);
 
   // Load messages when socket reconnects
   useEffect(() => {
     if (isConnected && activeConversationId && activeConversationId === conversation?._id) {
       // Rejoin conversation and reload messages when socket reconnects
       console.log('Socket reconnected, rejoining conversation:', activeConversationId);
-      joinConversation(activeConversationId);
-      getMessages({ conversationId: activeConversationId, limit: 50 });
+      
+      const reconnectConversation = async () => {
+        try {
+          await joinConversation(activeConversationId);
+          await getMessages({ conversationId: activeConversationId, limit: 50 });
+        } catch (error) {
+          console.error('Failed to reconnect conversation:', error);
+        }
+      };
+
+      reconnectConversation();
     }
   }, [isConnected, activeConversationId, conversation?._id, joinConversation, getMessages]);
 

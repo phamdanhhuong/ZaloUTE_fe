@@ -100,15 +100,18 @@ export const ZaloLayout: React.FC = () => {
     }
 
     try {
+      console.log("Creating conversation with friend:", friend);
       // Create or get existing conversation with this friend
       const conversation = await createConversation({
         participantIds: [friend.id], // Only send friend ID, current user will be added automatically
         isGroup: false
       });
       
+      console.log("Received conversation:", conversation);
+      
       // Convert to SocketConversation format
       const socketConversation: SocketConversation = {
-        _id: conversation.id || '', // Handle undefined with fallback
+        _id: conversation._id || '', // Use _id from MongoDB response
         participants: [currentUser.id, friend.id],
         type: 'private',
         name: `${friend.firstname} ${friend.lastname}`,
@@ -116,6 +119,7 @@ export const ZaloLayout: React.FC = () => {
         updatedAt: conversation.updatedAt,
       };
       
+      console.log("Created socketConversation with ID:", socketConversation._id);
       setSelectedConversation(socketConversation);
       setActiveView("chat");
       

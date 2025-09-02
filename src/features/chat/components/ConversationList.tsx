@@ -122,7 +122,11 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
   // Filter conversations
   const filteredConversations = React.useMemo(() => {
-    let filtered = conversations;
+    if (!conversations || !Array.isArray(conversations)) {
+      return [];
+    }
+    
+    let filtered = [...conversations]; // Create copy to avoid mutation
 
     // Filter by search text
     if (searchText) {

@@ -108,45 +108,33 @@ export const useSocket = () => {
   }, [dispatch]);
 
   // Send message
-  const sendMessage = useCallback((data: SendMessageData) => {
-    if (!isConnected) {
-      dispatch(setError('Not connected to chat server'));
-      return;
-    }
-
+  const sendMessage = useCallback(async (data: SendMessageData) => {
     try {
-      socketService.sendMessage(data);
+      await socketService.sendMessage(data);
     } catch (error) {
       console.error('Failed to send message:', error);
       dispatch(setError('Failed to send message'));
     }
-  }, [isConnected, dispatch]);
+  }, [dispatch]);
 
   // Get messages for a conversation
-  const getMessages = useCallback((data: GetMessagesData) => {
-    if (!isConnected) {
-      dispatch(setError('Not connected to chat server'));
-      return;
-    }
-
+  const getMessages = useCallback(async (data: GetMessagesData) => {
     try {
-      socketService.getMessages(data);
+      await socketService.getMessages(data);
     } catch (error) {
       console.error('Failed to get messages:', error);
       dispatch(setError('Failed to load messages'));
     }
-  }, [isConnected, dispatch]);
+  }, [dispatch]);
 
   // Join conversation
-  const joinConversation = useCallback((conversationId: string) => {
-    if (!isConnected) return;
-
+  const joinConversation = useCallback(async (conversationId: string) => {
     try {
-      socketService.joinConversation(conversationId);
+      await socketService.joinConversation(conversationId);
     } catch (error) {
       console.error('Failed to join conversation:', error);
     }
-  }, [isConnected]);
+  }, []);
 
   // Leave conversation
   const leaveConversation = useCallback((conversationId: string) => {

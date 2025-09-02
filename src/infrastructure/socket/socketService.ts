@@ -118,34 +118,81 @@ class SocketService {
     return this.socket?.connected || false;
   }
 
+  // Wait for socket connection with timeout
+  private async waitForConnection(timeoutMs: number = 5000): Promise<void> {
+    if (this.isConnected()) return;
+    
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Socket connection timeout'));
+      }, timeoutMs);
+
+      const checkConnection = () => {
+        if (this.isConnected()) {
+          clearTimeout(timeout);
+          resolve();
+        } else {
+          setTimeout(checkConnection, 100);
+        }
+      };
+
+      checkConnection();
+    });
+  }
+
   // Send message
-  sendMessage(data: SendMessageData): void {
-    if (!this.socket) throw new Error('Socket not connected');
-    this.socket.emit(SOCKET_EVENTS.SEND_MESSAGE, data);
+  async sendMessage(data: SendMessageData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.SEND_MESSAGE, data);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      throw error;
+    }
   }
 
   // Get messages
-  getMessages(data: GetMessagesData): void {
-    if (!this.socket) throw new Error('Socket not connected');
-    this.socket.emit(SOCKET_EVENTS.GET_MESSAGES, data);
+  async getMessages(data: GetMessagesData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.GET_MESSAGES, data);
+    } catch (error) {
+      console.error('Failed to get messages:', error);
+      throw error;
+    }
   }
 
   // Get conversations
-  getConversations(): void {
-    if (!this.socket) throw new Error('Socket not connected');
-    this.socket.emit(SOCKET_EVENTS.GET_CONVERSATIONS, {});
+  async getConversations(): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.GET_CONVERSATIONS, {});
+    } catch (error) {
+      console.error('Failed to get conversations:', error);
+      throw error;
+    }
   }
 
   // Join conversation room
-  joinConversation(conversationId: string): void {
-    if (!this.socket) throw new Error('Socket not connected');
-    this.socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId });
+  async joinConversation(conversationId: string): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId });
+    } catch (error) {
+      console.error('Failed to join conversation:', error);
+      throw error;
+    }
   }
 
   // Leave conversation room
-  leaveConversation(conversationId: string): void {
-    if (!this.socket) throw new Error('Socket not connected');
-    this.socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId });
+  async leaveConversation(conversationId: string): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId });
+    } catch (error) {
+      console.error('Failed to leave conversation:', error);
+      throw error;
+    }
   }
 
   // Start typing
