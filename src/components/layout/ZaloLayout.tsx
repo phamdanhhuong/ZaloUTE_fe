@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button, Avatar } from "antd";
 import {
   MessageOutlined,
@@ -16,8 +16,11 @@ import { useAppSelector } from "@/store/hooks";
 import { selectUser } from "@/store/selectors";
 import "../../app/styles/zalo-layout.css";
 
-// Import components
+// Import components  
 import { ConversationList, ChatArea } from "@/features/chat";
+import { createConversation } from "@/features/chat/service";
+import { ChatArea as ChatAreaNew } from "@/features/chat/components/ChatAreaNew";
+import { useSocket } from "@/features/chat/hooks/useSocket";
 import {
   Friend,
   UserSearch,
@@ -28,6 +31,7 @@ import {
 } from "@/features/friend";
 import type { Conversation } from "@/features/chat/service";
 import type { User } from "@/features/friend/service";
+import type { SocketConversation } from "@/infrastructure/socket/socketService";
 
 type ActiveView = "chat" | "friends" | "friend-list" | "groups";
 type FriendTab = "friends" | "groups" | "friend-requests" | "group-invites";
@@ -35,7 +39,7 @@ type FriendTab = "friends" | "groups" | "friend-requests" | "group-invites";
 export const ZaloLayout: React.FC = () => {
   const [activeView, setActiveView] = useState<ActiveView>("chat");
   const [selectedConversation, setSelectedConversation] = useState<
-    Conversation | undefined
+    SocketConversation | undefined
   >();
   const [selectedUser, setSelectedUser] = useState<User | undefined>();
   const [showUserProfile, setShowUserProfile] = useState(false);
@@ -43,8 +47,38 @@ export const ZaloLayout: React.FC = () => {
     useState<FriendTab>("friends");
 
   const currentUser = useAppSelector(selectUser);
+  const token = useAppSelector((state) => state.user.token);
   const { loading, friends } = useFriends();
   const { requests: friendRequests, loadPendingRequests } = useFriendRequests();
+  
+  // Socket integration
+  const { isConnected, connect, disconnect, joinConversation } = useSocket();
+  
+  // Connect to socket when component mounts
+  useEffect(() => {
+    if (currentUser && !isConnected) {
+      console.log("Initializing socket connection for user:", currentUser.id);
+      console.log("Token available:", !!token);
+      if (token) {
+        connect();
+      }
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (isConnected) {
+        disconnect();
+      }
+    };
+  }, [currentUser, isConnected, token, connect, disconnect]);
+
+  // Auto-join conversation when socket connects
+  useEffect(() => {
+    if (isConnected && selectedConversation?._id) {
+      console.log("Socket connected, joining conversation:", selectedConversation._id);
+      joinConversation(selectedConversation._id);
+    }
+  }, [isConnected, selectedConversation?._id, joinConversation]);
 
   const getUserDisplayName = () => {
     if (!currentUser) return "User";
@@ -59,10 +93,42 @@ export const ZaloLayout: React.FC = () => {
     return name.charAt(0).toUpperCase();
   };
 
-  const handleChatWithFriend = (friend: User) => {
-    // In a real app, this would create a conversation or find existing one
-    console.log("Start chat with:", friend);
-    setActiveView("chat");
+  const handleChatWithFriend = async (friend: User) => {
+    if (!currentUser) {
+      console.error("Current user not available");
+      return;
+    }
+
+    try {
+      // Create or get existing conversation with this friend
+      const conversation = await createConversation({
+        participantIds: [friend.id], // Only send friend ID, current user will be added automatically
+        isGroup: false
+      });
+      
+      // Convert to SocketConversation format
+      const socketConversation: SocketConversation = {
+        _id: conversation.id,
+        participants: [currentUser.id, friend.id],
+        type: 'private',
+        name: `${friend.firstname} ${friend.lastname}`,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+      };
+      
+      setSelectedConversation(socketConversation);
+      setActiveView("chat");
+      
+      // Join conversation room only if socket is connected
+      if (socketConversation._id && isConnected) {
+        joinConversation(socketConversation._id);
+      } else if (!isConnected) {
+        console.warn("Socket not connected, conversation will be joined when connected");
+      }
+    } catch (error) {
+      console.error("Failed to create/get conversation:", error);
+      // Show user-friendly error message
+    }
   };
 
   const handleViewProfile = (user: User) => {
@@ -86,7 +152,8 @@ export const ZaloLayout: React.FC = () => {
 
     switch (activeView) {
       case "chat":
-        return <ChatArea conversation={selectedConversation} />;
+        console.log('Rendering ChatAreaNew with selectedConversation:', selectedConversation);
+        return <ChatAreaNew conversation={selectedConversation} />;
       case "friends":
         return renderFriendTabContent();
       default:
@@ -143,13 +210,47 @@ export const ZaloLayout: React.FC = () => {
     }
   };
 
+  // Convert regular conversation to socket conversation format
+  const handleConversationSelect = (conversation: Conversation) => {
+    console.log('Conversation selected:', conversation);
+    console.log('Conversation._id:', conversation._id);
+    console.log('Conversation.id:', conversation.id);
+    console.log('Conversation participants:', conversation.participants);
+    
+    const socketConversation: SocketConversation = {
+      _id: conversation._id || conversation.id || '', // Handle both _id and id with fallback
+      participants: conversation.participants.map(p => p._id), // Use _id for participants too
+      type: conversation.type || (conversation.isGroup ? 'group' : 'private'),
+      name: conversation.name,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+    };
+    
+    console.log('Created socketConversation:', socketConversation);
+    console.log('socketConversation._id:', socketConversation._id);
+    setSelectedConversation(socketConversation);
+    
+    // Join conversation room only if socket is connected
+    console.log('Socket connection state - isConnected:', isConnected);
+    console.log('Socket conversation ID exists:', !!socketConversation._id);
+    if (socketConversation._id && isConnected) {
+      console.log('Attempting to join conversation:', socketConversation._id);
+      joinConversation(socketConversation._id);
+    } else if (!isConnected) {
+      console.warn("Socket not connected, conversation will be joined when connected");
+    } else if (!socketConversation._id) {
+      console.error("No conversation ID available for joining");
+    }
+  };
+
   const renderSidebarContent = () => {
     switch (activeView) {
       case "chat":
         return (
           <ConversationList
-            activeConversationId={selectedConversation?.id}
-            onConversationSelect={setSelectedConversation}
+            activeConversationId={selectedConversation?._id}
+            onConversationSelect={handleConversationSelect}
+            currentUser={currentUser}
           />
         );
       case "friends":
@@ -222,6 +323,19 @@ export const ZaloLayout: React.FC = () => {
               <h1 className="title-text">
                 {activeView === "chat" && `Zalo - ${getUserDisplayName()}`}
                 {activeView === "friends" && "Danh sách bạn bè"}
+                {/* Socket connection status */}
+                {activeView === "chat" && (
+                  <span 
+                    style={{ 
+                      marginLeft: 8, 
+                      fontSize: 12,
+                      color: isConnected ? '#52c41a' : '#ff4d4f',
+                      fontWeight: 'normal' 
+                    }}
+                  >
+                    {isConnected ? '• Online' : '• Offline'}
+                  </span>
+                )}
               </h1>
               <div className="header-actions">
                 <Button className="header-action-btn" icon={<TeamOutlined />} />

@@ -36,11 +36,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   conversation,
   currentUser,
 }) => {
-  console.log('ChatArea received conversation:', conversation);
-  console.log('Extracting conversation ID:', conversation?._id || conversation?.id);
-  
   const { loading, messages, handleSendMessage } = useMessages(
-    conversation?._id || conversation?.id
+    conversation?.id
   );
   const { handleAddReaction } = useMessageReactions();
   const [messageInput, setMessageInput] = useState("");
@@ -62,19 +59,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       return conversation.name;
     }
 
-    if (conversation.isGroup || conversation.type === 'group') {
+    if (conversation.isGroup) {
       return `Nhóm ${conversation.participants.length} thành viên`;
     }
 
-    // For BackendUser structure (direct participant objects)
     const otherParticipant = conversation.participants.find(
-      (p) => p._id !== currentUser?.id
+      (p) => p.user.id !== currentUser?.id
     );
 
     if (otherParticipant) {
-      return `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim() || 
-             otherParticipant.username || 
-             otherParticipant.email;
+      const user = otherParticipant.user;
+      return `${user.firstname} ${user.lastname}`.trim() || user.username;
     }
 
     return "Cuộc trò chuyện";
@@ -301,5 +296,3 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     </div>
   );
 };
-
-export default ChatArea;

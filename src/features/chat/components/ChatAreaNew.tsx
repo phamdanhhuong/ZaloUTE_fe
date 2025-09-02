@@ -12,40 +12,40 @@ import {
   CheckCircleOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { useMessages, useMessageReactions } from "../hooks";
-import type { Conversation, Message } from "../service";
-import styles from "./ChatArea.module.css";
+import { useSocket } from "../hooks/useSocket";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "@/store";
+import { setActiveConversationId } from "@/store/slices/chatSlice";
+import { SocketMessage, SocketConversation } from "@/infrastructure/socket/socketService";
+import styles from "./ChatAreaNew.module.css";
 
 const { Text, Title } = Typography;
 
-// Import User type from friend service
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  firstname: string;
-  lastname: string;
-}
-
 interface ChatAreaProps {
-  conversation?: Conversation;
-  currentUser?: User;
+  conversation?: SocketConversation;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({
-  conversation,
-  currentUser,
-}) => {
-  console.log('ChatArea received conversation:', conversation);
-  console.log('Extracting conversation ID:', conversation?._id || conversation?.id);
+export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
+  console.log('ChatAreaNew received conversation:', conversation);
   
-  const { loading, messages, handleSendMessage } = useMessages(
-    conversation?._id || conversation?.id
-  );
-  const { handleAddReaction } = useMessageReactions();
+  const dispatch = useDispatch();
+  const { sendMessage, getMessages, startTyping, stopTyping, joinConversation, isConnected } = useSocket();
+  const { 
+    messages, 
+    activeConversationId, 
+    typingUsers, 
+    onlineUsers, 
+    isLoading 
+  } = useSelector((state: RootState) => state.chat);
+  const { user: currentUser } = useSelector((state: RootState) => state.user);
+
   const [messageInput, setMessageInput] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get messages for active conversation
+  const conversationMessages = activeConversationId ? messages[activeConversationId] || [] : [];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,7 +53,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [conversationMessages]);
+
+  // Set active conversation and load messages
+  useEffect(() => {
+    if (conversation && conversation._id !== activeConversationId) {
+      console.log('Setting active conversation:', conversation._id);
+      dispatch(setActiveConversationId(conversation._id));
+      
+      // Only call socket operations if connected
+      if (isConnected) {
+        console.log('Joining conversation and loading messages for:', conversation._id);
+        joinConversation(conversation._id);
+        getMessages({ conversationId: conversation._id, limit: 50 });
+      }
+    }
+  }, [conversation, activeConversationId, isConnected, dispatch, joinConversation, getMessages]);
+
+  // Load messages when socket reconnects
+  useEffect(() => {
+    if (isConnected && activeConversationId && activeConversationId === conversation?._id) {
+      // Rejoin conversation and reload messages when socket reconnects
+      console.log('Socket reconnected, rejoining conversation:', activeConversationId);
+      joinConversation(activeConversationId);
+      getMessages({ conversationId: activeConversationId, limit: 50 });
+    }
+  }, [isConnected, activeConversationId, conversation?._id, joinConversation, getMessages]);
 
   const getConversationName = () => {
     if (!conversation) return "";
@@ -62,19 +87,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       return conversation.name;
     }
 
-    if (conversation.isGroup || conversation.type === 'group') {
+    if (conversation.type === 'group') {
       return `Nhóm ${conversation.participants.length} thành viên`;
-    }
-
-    // For BackendUser structure (direct participant objects)
-    const otherParticipant = conversation.participants.find(
-      (p) => p._id !== currentUser?.id
-    );
-
-    if (otherParticipant) {
-      return `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim() || 
-             otherParticipant.username || 
-             otherParticipant.email;
     }
 
     return "Cuộc trò chuyện";
@@ -86,16 +100,53 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handleSend = async () => {
-    if (!messageInput.trim() || sending) return;
+    if (!messageInput.trim() || sending || !conversation) return;
 
     setSending(true);
     try {
-      await handleSendMessage(messageInput.trim());
+      sendMessage({
+        conversationId: conversation._id,
+        content: messageInput.trim(),
+        type: 'text'
+      });
       setMessageInput("");
+      
+      // Stop typing when message is sent
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      stopTyping(conversation._id);
     } catch (error) {
       console.error("Send message failed:", error);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setMessageInput(value);
+
+    if (!conversation) return;
+
+    // Handle typing indicators
+    if (value.trim()) {
+      startTyping(conversation._id);
+      
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Set new timeout to stop typing after 3 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        stopTyping(conversation._id);
+      }, 3000);
+    } else {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      stopTyping(conversation._id);
     }
   };
 
@@ -114,25 +165,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     });
   };
 
-  const getSenderName = (message: Message) => {
-    if (message.sender.id === currentUser?.id) {
-      return "Bạn";
+  const getMessageSenderName = (message: SocketMessage) => {
+    if (message.sender && message.sender.firstName && message.sender.lastName) {
+      return `${message.sender.firstName} ${message.sender.lastName}`.trim();
     }
-    return `${message.sender.firstname} ${message.sender.lastname}`.trim() || message.sender.username;
+    return message.sender?.email || 'Unknown User';
   };
 
-  const getSenderAvatar = (message: Message) => {
-    const name = getSenderName(message);
-    return name.charAt(0).toUpperCase();
+  const isCurrentUserMessage = (message: SocketMessage) => {
+    return message.sender?._id === currentUser?.id;
   };
 
-  const handleReactionClick = async (messageId: string, emoji: string) => {
-    try {
-      await handleAddReaction(messageId, emoji);
-    } catch (error) {
-      console.error("Add reaction failed:", error);
-    }
-  };
+  // Get typing users for current conversation (excluding current user)
+  const currentTypingUsers = typingUsers.filter(
+    user => user.conversationId === conversation?._id && user.userId !== currentUser?.id
+  );
 
   if (!conversation) {
     return (
@@ -159,7 +206,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <Title level={5} className={styles.participantName}>
               {getConversationName()}
             </Title>
-            {conversation.isGroup && (
+            {conversation.type === 'group' && (
               <Text type="secondary" className={styles.participantStatus}>
                 {conversation.participants.length} thành viên
               </Text>
@@ -188,38 +235,38 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Messages Area */}
       <div className={styles.messagesContainer}>
-        {loading ? (
+        {isLoading ? (
           <div className={styles.loadingContainer}>
             <Spin />
           </div>
-        ) : messages.length === 0 ? (
+        ) : conversationMessages.length === 0 ? (
           <div className={styles.emptyMessages}>
             <Empty description="Chưa có tin nhắn nào" />
           </div>
         ) : (
           <div className={styles.messagesList}>
-            {messages.map((message, index) => {
-              const isCurrentUser = message.sender.id === currentUser?.id;
+            {conversationMessages.map((message, index) => {
+              const isCurrentUser = isCurrentUserMessage(message);
               const showAvatar = index === 0 || 
-                messages[index - 1].sender.id !== message.sender.id;
+                conversationMessages[index - 1].sender?._id !== message.sender?._id;
               
               return (
                 <div
-                  key={message.id}
+                  key={message._id}
                   className={`${styles.messageWrapper} ${
                     isCurrentUser ? styles.currentUser : styles.otherUser
                   }`}
                 >
                   {!isCurrentUser && showAvatar && (
                     <Avatar size="small" className={styles.messageAvatar}>
-                      {getSenderAvatar(message)}
+                      <UserOutlined />
                     </Avatar>
                   )}
                   
                   <div className={styles.messageContent}>
                     {!isCurrentUser && showAvatar && (
                       <Text className={styles.senderName}>
-                        {getSenderName(message)}
+                        {getMessageSenderName(message)}
                       </Text>
                     )}
                     
@@ -229,35 +276,31 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       </div>
                       <div className={styles.messageTime}>
                         {formatMessageTime(message.createdAt)}
-                        {isCurrentUser && (
+                        {isCurrentUser && message.isRead && (
                           <CheckCircleOutlined className={styles.readIcon} />
                         )}
                       </div>
                     </div>
-                    
-                    {/* Reactions */}
-                    {message.reactions && message.reactions.length > 0 && (
-                      <div className={styles.reactions}>
-                        {message.reactions.map((reaction) => (
-                          <div key={reaction.id} className={styles.reaction}>
-                            <span>{reaction.emoji}</span>
-                            <span className={styles.reactionCount}>1</span>
-                          </div>
-                        ))}
-                        
-                        {/* Add reaction button */}
-                        <div
-                          className={styles.reaction}
-                          onClick={() => handleReactionClick(message.id, "👍")}
-                        >
-                          <span>👍</span>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
             })}
+            
+            {/* Typing indicator */}
+            {currentTypingUsers.length > 0 && (
+              <div className={styles.typingIndicator}>
+                <Avatar size="small" className={styles.messageAvatar}>
+                  <UserOutlined />
+                </Avatar>
+                <div className={styles.typingBubble}>
+                  <div className={styles.typingDots}>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div ref={messagesEndRef} />
           </div>
@@ -275,11 +318,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           
           <Input.TextArea
             value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             placeholder="Nhập tin nhắn..."
             autoSize={{ minRows: 1, maxRows: 4 }}
             className={styles.textInput}
+            disabled={!isConnected}
           />
           
           <Button
@@ -293,13 +337,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             icon={<SendOutlined />}
             onClick={handleSend}
             loading={sending}
-            disabled={!messageInput.trim()}
+            disabled={!messageInput.trim() || !isConnected}
             className={styles.sendButton}
           />
         </div>
+        
+        {!isConnected && (
+          <div className={styles.connectionStatus}>
+            <Text type="danger">Đã mất kết nối với máy chủ</Text>
+          </div>
+        )}
       </div>
     </div>
   );
 };
-
-export default ChatArea;

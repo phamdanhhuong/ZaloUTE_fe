@@ -32,14 +32,36 @@ export interface MessageReaction {
   };
 }
 
-export interface Conversation {
-  id: string;
+// Interface matching actual backend response
+interface BackendUser {
+  _id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  username?: string;
+}
+
+interface BackendConversation {
+  _id: string;
+  participants: BackendUser[]; // Direct array of populated User documents
+  type: 'private' | 'group';
   name?: string;
-  isGroup: boolean;
+  avatar?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Conversation {
+  _id: string; // MongoDB ObjectId
+  id?: string; // For compatibility
+  name?: string;
+  isGroup?: boolean;
+  type?: 'private' | 'group'; // MongoDB field
+  groupName?: string; // MongoDB field for group conversations
   createdAt: string;
   updatedAt: string;
   lastMessage?: Message;
-  participants: ConversationParticipant[];
+  participants: BackendUser[]; // Simplified to match backend
   unreadCount?: number;
 }
 
@@ -110,10 +132,12 @@ export const getMessages = async (
   params: GetMessagesRequest
 ): Promise<GetMessagesResponse> => {
   try {
+    console.log('Calling getMessages API with params:', params);
     const response = await axiosClient.get(`/conversation/${params.conversationId}/messages`, {
       params: { limit: params.limit, offset: params.offset }
     });
-    return response as GetMessagesResponse;
+    console.log('getMessages API response:', response);
+    return response as unknown as GetMessagesResponse;
   } catch (error) {
     console.error("Get messages failed:", error);
     throw error;

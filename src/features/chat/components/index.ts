@@ -1,4 +1,6 @@
 export { default as ConversationList } from "./ConversationList";
-export { default as ChatArea } from "./ChatArea";
+export { ChatArea } from "./ChatAreaNew";
+export { ConversationList as ConversationListNew } from "./ConversationListNew";
+export { ChatPage } from "./ChatPage";
 
 
