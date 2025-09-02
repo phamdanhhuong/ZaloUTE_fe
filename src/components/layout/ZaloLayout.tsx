@@ -108,7 +108,7 @@ export const ZaloLayout: React.FC = () => {
       
       // Convert to SocketConversation format
       const socketConversation: SocketConversation = {
-        _id: conversation.id,
+        _id: conversation.id || '', // Handle undefined with fallback
         participants: [currentUser.id, friend.id],
         type: 'private',
         name: `${friend.firstname} ${friend.lastname}`,
@@ -210,6 +210,38 @@ export const ZaloLayout: React.FC = () => {
     }
   };
 
+  // Helper function to calculate conversation name
+  const getConversationName = (conversation: Conversation) => {
+    if (conversation.name) {
+      return conversation.name;
+    }
+
+    // Check for group conversation
+    if (conversation.type === 'group' || conversation.isGroup) {
+      return conversation.groupName || conversation.name || `Nhóm ${conversation.participants?.length || 0} thành viên`;
+    }
+
+    // For 1-on-1 conversation, get the other participant's name
+    if (!conversation.participants || conversation.participants.length === 0) {
+      return "Cuộc trò chuyện";
+    }
+    
+    // Find the other participant (not current user)
+    const otherParticipant = conversation.participants.find(user => {
+      const userId = user._id;
+      return userId && userId !== currentUser?.id;
+    });
+
+    if (otherParticipant) {
+      const firstName = otherParticipant.firstname || '';
+      const lastName = otherParticipant.lastname || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+      return fullName || otherParticipant.username || otherParticipant.email || 'Unknown User';
+    }
+
+    return "Cuộc trò chuyện";
+  };
+
   // Convert regular conversation to socket conversation format
   const handleConversationSelect = (conversation: Conversation) => {
     console.log('Conversation selected:', conversation);
@@ -221,7 +253,7 @@ export const ZaloLayout: React.FC = () => {
       _id: conversation._id || conversation.id || '', // Handle both _id and id with fallback
       participants: conversation.participants.map(p => p._id), // Use _id for participants too
       type: conversation.type || (conversation.isGroup ? 'group' : 'private'),
-      name: conversation.name,
+      name: getConversationName(conversation), // Use calculated name
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
     };

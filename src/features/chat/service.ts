@@ -36,8 +36,8 @@ export interface MessageReaction {
 interface BackendUser {
   _id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  firstname: string;
+  lastname: string;
   username?: string;
 }
 

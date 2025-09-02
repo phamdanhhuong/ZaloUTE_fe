@@ -61,8 +61,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     console.log('Other participant:', otherParticipant); // Debug log
 
     if (otherParticipant) {
-      const firstName = otherParticipant.firstName || '';
-      const lastName = otherParticipant.lastName || '';
+      const firstName = otherParticipant.firstname || '';
+      const lastName = otherParticipant.lastname || '';
       const fullName = `${firstName} ${lastName}`.trim();
       return fullName || otherParticipant.username || otherParticipant.email || 'Unknown User';
     }

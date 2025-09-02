@@ -83,12 +83,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const getConversationName = () => {
     if (!conversation) return "";
 
+    // Name should already be calculated and passed from parent
     if (conversation.name) {
       return conversation.name;
     }
 
+    // Fallback logic
     if (conversation.type === 'group') {
-      return `Nhóm ${conversation.participants.length} thành viên`;
+      return `Nhóm ${conversation.participants?.length || 0} thành viên`;
     }
 
     return "Cuộc trò chuyện";
