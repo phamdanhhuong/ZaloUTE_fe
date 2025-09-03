@@ -32,14 +32,36 @@ export interface MessageReaction {
   };
 }
 
-export interface Conversation {
-  id: string;
+// Interface matching actual backend response
+interface BackendUser {
+  _id: string;
+  email: string;
+  firstname: string;
+  lastname: string;
+  username?: string;
+}
+
+interface BackendConversation {
+  _id: string;
+  participants: BackendUser[]; // Direct array of populated User documents
+  type: 'private' | 'group';
   name?: string;
-  isGroup: boolean;
+  avatar?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Conversation {
+  _id: string; // MongoDB ObjectId
+  id?: string; // For compatibility
+  name?: string;
+  isGroup?: boolean;
+  type?: 'private' | 'group'; // MongoDB field
+  groupName?: string; // MongoDB field for group conversations
   createdAt: string;
   updatedAt: string;
   lastMessage?: Message;
-  participants: ConversationParticipant[];
+  participants: BackendUser[]; // Simplified to match backend
   unreadCount?: number;
 }
 
@@ -85,7 +107,17 @@ export interface GetMessagesResponse {
 export const getConversations = async (): Promise<Conversation[]> => {
   try {
     const response = await axiosClient.get("/conversation/list");
-    return response as Conversation[];
+    console.log("Get conversations response:", response);
+    
+    // The axios interceptor extracts data from wrapped responses,
+    // so response is the data directly (not response.data)
+    if (Array.isArray(response)) {
+      console.log("Parsed conversations data:", response);
+      return response as Conversation[];
+    } else {
+      console.error("Unexpected response format - expected array, got:", typeof response, response);
+      return [];
+    }
   } catch (error) {
     console.error("Get conversations failed:", error);
     throw error;
@@ -98,7 +130,12 @@ export const createConversation = async (
 ): Promise<Conversation> => {
   try {
     const response = await axiosClient.post("/conversation", payload);
-    return response as Conversation;
+    console.log("Create conversation response:", response);
+    console.log("Response data:", response.data);
+    // Check if response has wrapper or direct data
+    const data = response.data.data || response.data;
+    console.log("Parsed conversation data:", data);
+    return data as Conversation;
   } catch (error) {
     console.error("Create conversation failed:", error);
     throw error;
@@ -110,10 +147,12 @@ export const getMessages = async (
   params: GetMessagesRequest
 ): Promise<GetMessagesResponse> => {
   try {
+    console.log('Calling getMessages API with params:', params);
     const response = await axiosClient.get(`/conversation/${params.conversationId}/messages`, {
       params: { limit: params.limit, offset: params.offset }
     });
-    return response as GetMessagesResponse;
+    console.log('getMessages API response:', response);
+    return response as unknown as GetMessagesResponse;
   } catch (error) {
     console.error("Get messages failed:", error);
     throw error;
@@ -150,7 +189,7 @@ export const addReaction = async (
 ): Promise<MessageReaction> => {
   try {
     const response = await axiosClient.post(`/message/${messageId}/reaction`, { emoji });
-    return response as MessageReaction;
+    return response.data as MessageReaction;
   } catch (error) {
     console.error("Add reaction failed:", error);
     throw error;
@@ -176,7 +215,7 @@ export const searchMessages = async (
     const response = await axiosClient.get(`/conversation/${conversationId}/search`, {
       params: { q: query }
     });
-    return response as Message[];
+    return response.data as Message[];
   } catch (error) {
     console.error("Search messages failed:", error);
     throw error;

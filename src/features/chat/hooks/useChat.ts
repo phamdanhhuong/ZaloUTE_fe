@@ -72,6 +72,7 @@ export const useMessages = (conversationId?: string) => {
   const loadMessages = useCallback(async (reset = false) => {
     if (!conversationId) return;
     
+    console.log(`Loading messages for conversation ${conversationId}, reset: ${reset}`);
     setLoading(true);
     try {
       const offset = reset ? 0 : messages.length;
@@ -80,6 +81,8 @@ export const useMessages = (conversationId?: string) => {
         limit: 20,
         offset,
       });
+      
+      console.log('Messages loaded:', data);
       
       if (reset) {
         setMessages(data.messages);
@@ -91,6 +94,7 @@ export const useMessages = (conversationId?: string) => {
       setHasMore(data.messages.length === 20);
       return data;
     } catch (err: any) {
+      console.error('Load messages error:', err);
       const msg = err?.response?.data?.message || "Tải tin nhắn thất bại";
       antdMessage.error(msg);
       throw err;
@@ -140,9 +144,12 @@ export const useMessages = (conversationId?: string) => {
 
   useEffect(() => {
     if (conversationId) {
+      console.log('Loading messages for conversation:', conversationId);
       clearMessages();
       loadMessages(true);
       handleMarkAsRead();
+    } else {
+      console.log('No conversation ID provided to useMessages');
     }
   }, [conversationId]);
 

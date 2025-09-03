@@ -9,21 +9,13 @@ import {
 } from "@ant-design/icons";
 import { useConversations } from "../hooks";
 import type { Conversation } from "../service";
+import { LoginUser } from "@/features/auth/login/service";
 import styles from "./ConversationList.module.css";
-
-// Import User type from friend service
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  firstname: string;
-  lastname: string;
-}
 
 interface ConversationListProps {
   activeConversationId?: string;
   onConversationSelect?: (conversation: Conversation) => void;
-  currentUser?: User;
+  currentUser?: LoginUser | null;
 }
 
 export const ConversationList: React.FC<ConversationListProps> = ({
@@ -35,23 +27,44 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const [searchText, setSearchText] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
 
+  console.log('ConversationList currentUser prop:', currentUser); // Debug log
+  console.log('ConversationList currentUser.id:', currentUser?.id); // Debug log
+
   const getConversationName = (conversation: Conversation) => {
+    console.log('Getting name for conversation:', conversation); // Debug log
+    
     if (conversation.name) {
       return conversation.name;
     }
 
-    if (conversation.isGroup) {
-      return `Nhóm ${conversation.participants.length} thành viên`;
+    // Check for group conversation - MongoDB uses type field
+    if (conversation.type === 'group' || conversation.isGroup) {
+      return conversation.groupName || conversation.name || `Nhóm ${conversation.participants?.length || 0} thành viên`;
     }
 
     // For 1-on-1 conversation, get the other participant's name
-    const otherParticipant = conversation.participants.find(
-      (p) => p.user.id !== currentUser?.id
-    );
+    console.log('Participants:', conversation.participants); // Debug log
+    console.log('Participants detailed structure:', JSON.stringify(conversation.participants, null, 2));
+    console.log('Current user ID:', currentUser?.id);
+    
+    if (!conversation.participants || conversation.participants.length === 0) {
+      return "Cuộc trò chuyện";
+    }
+    
+    // With the simplified backend structure, participants is an array of User objects directly
+    const otherParticipant = conversation.participants.find(user => {
+      const userId = user._id;
+      console.log('Checking user ID:', userId, 'vs current user:', currentUser?.id);
+      return userId && userId !== currentUser?.id;
+    });
+
+    console.log('Other participant:', otherParticipant); // Debug log
 
     if (otherParticipant) {
-      const user = otherParticipant.user;
-      return `${user.firstname} ${user.lastname}`.trim() || user.username;
+      const firstName = otherParticipant.firstname || '';
+      const lastName = otherParticipant.lastname || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+      return fullName || otherParticipant.username || otherParticipant.email || 'Unknown User';
     }
 
     return "Cuộc trò chuyện";
@@ -109,7 +122,11 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
   // Filter conversations
   const filteredConversations = React.useMemo(() => {
-    let filtered = conversations;
+    if (!conversations || !Array.isArray(conversations)) {
+      return [];
+    }
+    
+    let filtered = [...conversations]; // Create copy to avoid mutation
 
     // Filter by search text
     if (searchText) {
@@ -200,9 +217,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           <div className={styles.scrollArea}>
             {filteredConversations.map((conversation) => (
               <div
-                key={conversation.id}
+                key={conversation._id || conversation.id}
                 className={`${styles.conversationItem} ${
-                  activeConversationId === conversation.id ? styles.active : ""
+                  activeConversationId === (conversation._id || conversation.id) ? styles.active : ""
                 }`}
                 onClick={() => onConversationSelect?.(conversation)}
               >
@@ -214,14 +231,14 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                     </Avatar>
 
                     {/* Pin indicator for important conversations */}
-                    {conversation.id === activeConversationId && (
+                    {conversation._id === activeConversationId && (
                       <div className={styles.pinIndicator}>
                         <PushpinOutlined />
                       </div>
                     )}
 
                     {/* Member count for groups */}
-                    {conversation.isGroup && (
+                    {(conversation.type === 'group' || conversation.isGroup) && (
                       <div className={styles.memberCount}>
                         {conversation.participants.length}
                       </div>
@@ -232,7 +249,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                   <div className={styles.conversationInfo}>
                     <div className={styles.conversationHeader}>
                       <div className={styles.nameContainer}>
-                        {conversation.isGroup && (
+                        {(conversation.type === 'group' || conversation.isGroup) && (
                           <TeamOutlined className={styles.groupIcon} />
                         )}
                         <h3 className={styles.conversationName}>
