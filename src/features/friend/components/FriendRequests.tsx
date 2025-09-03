@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Avatar, Button, Empty, Spin } from "antd";
+import { Button, Empty, Spin } from "antd";
 import { CheckOutlined, CloseOutlined } from "@ant-design/icons";
+import { UserAvatar } from "@/components/UserAvatar";
 import type { User } from "../service";
 import { useFriendRequests } from "../hooks";
 import styles from "./FriendRequests.module.css";
@@ -25,11 +26,6 @@ export const FriendRequests: React.FC<FriendRequestsProps> = ({
 
   const getDisplayName = (user: User) => {
     return `${user.firstname} ${user.lastname}`.trim() || user.username;
-  };
-
-  const getAvatarText = (user: User) => {
-    const name = getDisplayName(user);
-    return name.charAt(0).toUpperCase();
   };
 
   const formatDate = (dateString: string) => {
@@ -106,13 +102,11 @@ export const FriendRequests: React.FC<FriendRequestsProps> = ({
         {requests.map((request) => (
           <div key={request.friendshipId} className={styles.requestItem}>
             <div className={styles.userInfo}>
-              <Avatar
+              <UserAvatar
+                user={request.requester}
                 size={48}
                 className={styles.avatar}
-                style={{ backgroundColor: "#1890ff" }}
-              >
-                {getAvatarText(request.requester)}
-              </Avatar>
+              />
 
               <div className={styles.userDetails}>
                 <div className={styles.userName}>

@@ -12,6 +12,7 @@ import {
   CheckCircleOutlined,
   UserOutlined,
 } from "@ant-design/icons";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useSocket } from "../hooks/useSocket";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
@@ -112,8 +113,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   };
 
   const getConversationAvatar = () => {
+
     const name = getConversationName();
-    return name.charAt(0).toUpperCase();
+    return (
+      <Avatar size={40} className={styles.avatar}>
+        {name.charAt(0).toUpperCase()}
+      </Avatar>
+    );
   };
 
   const handleSend = async () => {
@@ -193,6 +199,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     return message.sender?._id === currentUser?.id;
   };
 
+  const getMessageSenderAvatar = (message: SocketMessage) => {
+    if (!message.sender) {
+      return (
+        <Avatar size="small" className={styles.messageAvatar}>
+          <UserOutlined />
+        </Avatar>
+      );
+    }
+
+    return (
+      <UserAvatar
+        user={{
+          id: message.sender._id,
+          username: message.sender.username || '',
+          firstname: message.sender.firstname,
+          lastname: message.sender.lastname,
+          avatarUrl: message.sender.avatarUrl,
+        }}
+        size="small"
+        className={styles.messageAvatar}
+      />
+    );
+  };
+
   // Get typing users for current conversation (excluding current user)
   const currentTypingUsers = typingUsers.filter(
     user => user.conversationId === conversation?._id && user.userId !== currentUser?.id
@@ -216,9 +246,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
       {/* Chat Header */}
       <div className={styles.chatHeader}>
         <div className={styles.participantInfo}>
-          <Avatar size={40} className={styles.avatar}>
-            {getConversationAvatar()}
-          </Avatar>
+          {getConversationAvatar()}
           <div className={styles.participantDetails}>
             <Title level={5} className={styles.participantName}>
               {getConversationName()}
@@ -274,11 +302,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
                     isCurrentUser ? styles.currentUser : styles.otherUser
                   }`}
                 >
-                  {!isCurrentUser && showAvatar && (
-                    <Avatar size="small" className={styles.messageAvatar}>
-                      <UserOutlined />
-                    </Avatar>
-                  )}
+                  {!isCurrentUser && showAvatar && 
+                    getMessageSenderAvatar(message)
+                  }
                   
                   <div className={styles.messageContent}>
                     {!isCurrentUser && showAvatar && (

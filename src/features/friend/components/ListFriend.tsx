@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Avatar, List, Button, Input, Empty, Spin } from "antd";
+import { List, Button, Input, Empty, Spin } from "antd";
 import { SearchOutlined, EllipsisOutlined } from "@ant-design/icons";
+import { UserAvatar } from "@/components/UserAvatar";
 import type { User } from "../service";
 import styles from "./ListFriend.module.css";
 
@@ -29,11 +30,6 @@ export const ListFriend: React.FC<ListFriendProps> = ({
 
   const getDisplayName = (user: User) => {
     return `${user.firstname} ${user.lastname}`.trim() || user.username;
-  };
-
-  const getAvatarText = (user: User) => {
-    const name = getDisplayName(user);
-    return name.charAt(0).toUpperCase();
   };
 
   // Lọc và nhóm bạn bè theo chữ cái đầu
@@ -152,17 +148,11 @@ export const ListFriend: React.FC<ListFriendProps> = ({
                     >
                       <List.Item.Meta
                         avatar={
-                          <Avatar
+                          <UserAvatar
+                            user={friend}
                             size={44}
                             className={styles.friendAvatar}
-                            style={{
-                              backgroundColor: `hsl(${
-                                (Number(friend.id) * 137.5) % 360
-                              }, 70%, 50%)`,
-                            }}
-                          >
-                            {getAvatarText(friend)}
-                          </Avatar>
+                          />
                         }
                         title={
                           <div className={styles.friendName}>

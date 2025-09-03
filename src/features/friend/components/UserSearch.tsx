@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Input, Button, List, Avatar, Spin, Empty } from "antd";
+import { Input, Button, List, Spin, Empty } from "antd";
 import { SearchOutlined, UserAddOutlined } from "@ant-design/icons";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useFriendSearch, useSendFriendRequest } from "../hooks";
 import type { User } from "../service";
 import styles from "./UserSearch.module.css";
@@ -60,11 +61,6 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect }) => {
 
   const getDisplayName = (user: User) => {
     return `${user.firstname} ${user.lastname}`.trim() || user.username;
-  };
-
-  const getAvatarText = (user: User) => {
-    const name = getDisplayName(user);
-    return name.charAt(0).toUpperCase();
   };
 
   const getFriendshipStatusText = (user: User) => {
@@ -148,9 +144,11 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect }) => {
             >
               <List.Item.Meta
                 avatar={
-                  <Avatar size={48} className={styles.userAvatar}>
-                    {getAvatarText(user)}
-                  </Avatar>
+                  <UserAvatar
+                    user={user}
+                    size={48}
+                    className={styles.userAvatar}
+                  />
                 }
                 title={getDisplayName(user)}
                 description={

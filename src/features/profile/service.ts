@@ -36,3 +36,25 @@ export const updateUserProfile = async (data: UpdateProfileRequest): Promise<Log
     throw error;
   }
 };
+
+export interface UploadAvatarResponse {
+  message: string;
+  avatarUrl: string;
+}
+
+export const uploadAvatar = async (file: File): Promise<UploadAvatarResponse> => {
+  try {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    const response: UploadAvatarResponse = await axiosClient.post("/user/profile/upload-avatar", formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response;
+  } catch (error) {
+    console.error("Upload avatar failed:", error);
+    throw error;
+  }
+};

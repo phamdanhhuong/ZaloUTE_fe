@@ -1,11 +1,14 @@
 import React, { useState } from "react";
-import { Avatar, Card, Button, Space, Typography } from "antd";
+import { Avatar, Card, Button, Space, Typography, Upload, message } from "antd";
 import {
   UserOutlined,
   LogoutOutlined,
   ReloadOutlined,
   EditOutlined,
+  CameraOutlined,
 } from "@ant-design/icons";
+import { UploadProps } from "antd";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useAuth } from "@/store/hooks";
 import { useProfile } from "../hooks";
 import { EditProfileForm } from "./EditProfileForm";
@@ -16,7 +19,7 @@ const { Text, Title } = Typography;
 export const UserProfile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const { user, userFullName, isAuthenticated, logout } = useAuth();
-  const { refreshing, refreshProfile, updating, updateProfile } = useProfile();
+  const { refreshing, refreshProfile, updating, updateProfile, uploading, uploadProfileAvatar } = useProfile();
 
   const handleEditClick = () => {
     setIsEditing(true);
@@ -28,7 +31,30 @@ export const UserProfile: React.FC = () => {
 
   const handleSaveProfile = async (data: UpdateProfileRequest) => {
     await updateProfile(data);
-    setIsEditing(false); // Tự động thoát edit mode sau khi save thành công
+    setIsEditing(false); 
+  };
+
+  const handleAvatarUpload: UploadProps['customRequest'] = async (options) => {
+    const { file } = options;
+    try {
+      await uploadProfileAvatar(file as File);
+    } catch (error) {
+      // Error handling is done in the hook
+    }
+  };
+
+  const beforeUpload = (file: File) => {
+    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/jpg';
+    if (!isJpgOrPng) {
+      message.error('Chỉ có thể upload file JPG/PNG!');
+      return false;
+    }
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      message.error('Kích thước file phải nhỏ hơn 5MB!');
+      return false;
+    }
+    return true;
   };
 
   if (!isAuthenticated || !user) {
@@ -80,8 +106,40 @@ export const UserProfile: React.FC = () => {
         />
       ) : (
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-          <div style={{ textAlign: "center" }}>
-            <Avatar size={64} icon={<UserOutlined />} />
+          <div style={{ textAlign: "center", position: "relative" }}>
+            <UserAvatar 
+              user={user}
+              size={64}
+            />
+            <Upload
+              name="avatar"
+              showUploadList={false}
+              beforeUpload={beforeUpload}
+              customRequest={handleAvatarUpload}
+              disabled={uploading || isEditing || updating}
+            >
+              <Button
+                type="text"
+                icon={<CameraOutlined />}
+                loading={uploading}
+                disabled={isEditing || updating}
+                style={{
+                  position: "absolute",
+                  bottom: -5,
+                  right: "50%",
+                  transform: "translateX(50%)",
+                  minWidth: "auto",
+                  padding: "4px 8px",
+                  fontSize: "12px",
+                  height: "auto",
+                  border: "1px solid #d9d9d9",
+                  borderRadius: "4px",
+                  backgroundColor: "white"
+                }}
+              >
+                {uploading ? "" : "Đổi"}
+              </Button>
+            </Upload>
           </div>
 
           <div>

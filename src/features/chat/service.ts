@@ -131,10 +131,25 @@ export const createConversation = async (
   try {
     const response = await axiosClient.post("/conversation", payload);
     console.log("Create conversation response:", response);
-    console.log("Response data:", response.data);
-    // Check if response has wrapper or direct data
-    const data = response.data.data || response.data;
+    
+    let data;
+    if (response && typeof response === 'object') {
+      if ('data' in response && response.data) {
+        console.log("Response data:", response.data);
+        data = response.data.data || response.data;
+      } else {
+        data = response;
+      }
+    } else {
+      throw new Error("Invalid response format");
+    }
+    
     console.log("Parsed conversation data:", data);
+    
+    if (!data) {
+      throw new Error("No data received from server");
+    }
+    
     return data as Conversation;
   } catch (error) {
     console.error("Create conversation failed:", error);
@@ -165,7 +180,14 @@ export const sendMessage = async (
 ): Promise<Message> => {
   try {
     const response = await axiosClient.post("/message", payload);
-    return response as Message;
+    let data;
+    if (response && typeof response === 'object') {
+      data = ('data' in response && response.data) ? response.data : response;
+    } else {
+      throw new Error("Invalid response format");
+    }
+    
+    return data as Message;
   } catch (error) {
     console.error("Send message failed:", error);
     throw error;
@@ -189,7 +211,15 @@ export const addReaction = async (
 ): Promise<MessageReaction> => {
   try {
     const response = await axiosClient.post(`/message/${messageId}/reaction`, { emoji });
-    return response.data as MessageReaction;
+    
+    let data;
+    if (response && typeof response === 'object') {
+      data = ('data' in response && response.data) ? response.data : response;
+    } else {
+      throw new Error("Invalid response format");
+    }
+    
+    return data as MessageReaction;
   } catch (error) {
     console.error("Add reaction failed:", error);
     throw error;
@@ -215,7 +245,14 @@ export const searchMessages = async (
     const response = await axiosClient.get(`/conversation/${conversationId}/search`, {
       params: { q: query }
     });
-    return response.data as Message[];
+    let data;
+    if (response && typeof response === 'object') {
+      data = ('data' in response && response.data) ? response.data : response;
+    } else {
+      throw new Error("Invalid response format");
+    }
+    
+    return data as Message[];
   } catch (error) {
     console.error("Search messages failed:", error);
     throw error;

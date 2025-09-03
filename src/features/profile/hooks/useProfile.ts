@@ -2,11 +2,12 @@ import { useState } from "react";
 import { message } from "antd";
 import { useAppDispatch } from "@/store/hooks";
 import { updateUser } from "@/store/slices/userSlice";
-import { getUserProfile, updateUserProfile, UpdateProfileRequest } from "../service";
+import { getUserProfile, updateUserProfile, UpdateProfileRequest, uploadAvatar } from "../service";
 
 export const useProfile = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const dispatch = useAppDispatch();
 
   const refreshProfile = async () => {
@@ -59,10 +60,32 @@ export const useProfile = () => {
     }
   };
 
+  const uploadProfileAvatar = async (file: File) => {
+    setUploading(true);
+    try {
+      const uploadResult = await uploadAvatar(file);
+      
+      await refreshProfile();
+      
+      message.success("Cập nhật avatar thành công!");
+      return uploadResult;
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message || "Không thể upload avatar";
+      message.error(msg);
+      console.error("Upload avatar failed:", error);
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return {
     refreshing,
     refreshProfile,
     updating,
     updateProfile,
+    uploading,
+    uploadProfileAvatar,
   };
 };

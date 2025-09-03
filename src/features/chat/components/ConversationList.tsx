@@ -7,6 +7,7 @@ import {
   TeamOutlined,
   PushpinOutlined,
 } from "@ant-design/icons";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useConversations } from "../hooks";
 import type { Conversation } from "../service";
 import { LoginUser } from "@/features/auth/login/service";
@@ -71,8 +72,43 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   };
 
   const getConversationAvatar = (conversation: Conversation) => {
+    if (conversation.type === 'group' || conversation.isGroup) {
+      const name = getConversationName(conversation);
+      return (
+        <Avatar size={48} className={styles.avatar}>
+          {name.charAt(0).toUpperCase()}
+        </Avatar>
+      );
+    }
+
+    const otherParticipant = conversation.participants?.find(user => {
+      const userId = user._id;
+      return userId && userId !== currentUser?.id;
+    });
+
+    if (otherParticipant) {
+      return (
+        <UserAvatar
+          user={{
+            id: otherParticipant._id,
+            username: otherParticipant.username || '',
+            firstname: otherParticipant.firstname,
+            lastname: otherParticipant.lastname,
+            avatarUrl: otherParticipant.avatarUrl,
+          }}
+          size={48}
+          className={styles.avatar}
+        />
+      );
+    }
+
+    // Fallback
     const name = getConversationName(conversation);
-    return name.charAt(0).toUpperCase();
+    return (
+      <Avatar size={48} className={styles.avatar}>
+        {name.charAt(0).toUpperCase()}
+      </Avatar>
+    );
   };
 
   const formatTime = (dateString: string) => {
@@ -226,9 +262,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                 <div className={styles.conversationContent}>
                   {/* Avatar */}
                   <div className={styles.avatarContainer}>
-                    <Avatar size={48} className={styles.avatar}>
-                      {getConversationAvatar(conversation)}
-                    </Avatar>
+                    {getConversationAvatar(conversation)}
 
                     {/* Pin indicator for important conversations */}
                     {conversation._id === activeConversationId && (

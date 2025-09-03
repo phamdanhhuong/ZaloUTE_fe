@@ -12,6 +12,7 @@ export interface LoginUser {
   firstname: string;
   lastname: string;
   phone: string;
+  avatarUrl?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

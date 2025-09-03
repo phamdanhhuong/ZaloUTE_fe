@@ -12,6 +12,7 @@ import {
   ContactsOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useRouter } from "next/navigation";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
 import { selectUser, selectIsAuthenticated } from "@/store/selectors";
@@ -120,11 +121,6 @@ export const ZaloLayout: React.FC = () => {
       `${currentUser.firstname} ${currentUser.lastname}`.trim() ||
       currentUser.username
     );
-  };
-
-  const getUserAvatar = () => {
-    const name = getUserDisplayName();
-    return name.charAt(0).toUpperCase();
   };
 
   const handleChatWithFriend = async (friend: User) => {
@@ -373,9 +369,19 @@ export const ZaloLayout: React.FC = () => {
           trigger={['click']}
           placement="bottomLeft"
         >
-          <Avatar className="user-avatar" size={40} style={{ cursor: 'pointer' }}>
-            {getUserAvatar()}
-          </Avatar>
+          <div style={{ cursor: 'pointer' }}>
+            <UserAvatar
+              user={{
+                id: currentUser?.id || '',
+                username: currentUser?.username || '',
+                firstname: currentUser?.firstname,
+                lastname: currentUser?.lastname,
+                avatarUrl: currentUser?.avatarUrl,
+              }}
+              size={40}
+              className="user-avatar"
+            />
+          </div>
         </Dropdown>
 
         {/* Navigation Icons */}
@@ -468,3 +474,5 @@ export const ZaloLayout: React.FC = () => {
 };
 
 export default ZaloLayout;
+
+
