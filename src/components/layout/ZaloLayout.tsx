@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Button, Avatar } from "antd";
+import React, { useState, useEffect } from "react";
+import { Button, Avatar, Dropdown, Menu, Spin } from "antd";
 import {
   MessageOutlined,
   TeamOutlined,
@@ -11,9 +11,12 @@ import {
   SettingOutlined,
   UserOutlined,
   ContactsOutlined,
+  LogoutOutlined,
 } from "@ant-design/icons";
-import { useAppSelector } from "@/store/hooks";
-import { selectUser } from "@/store/selectors";
+import { useRouter } from "next/navigation";
+import { useAppSelector, useAppDispatch } from "@/store/hooks";
+import { selectUser, selectIsAuthenticated } from "@/store/selectors";
+import { logout, initializeFromStorage } from "@/store/slices/userSlice";
 import "../../app/styles/zalo-layout.css";
 
 // Import components
@@ -41,10 +44,43 @@ export const ZaloLayout: React.FC = () => {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [selectedFriendTab, setSelectedFriendTab] =
     useState<FriendTab>("friends");
+  const [isInitialized, setIsInitialized] = useState(false);
 
+  const router = useRouter();
+  const dispatch = useAppDispatch();
   const currentUser = useAppSelector(selectUser);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const { loading, friends } = useFriends();
   const { requests: friendRequests, loadPendingRequests } = useFriendRequests();
+
+  // Authentication guard and initialization
+  useEffect(() => {
+    // Initialize user from localStorage on component mount
+    dispatch(initializeFromStorage());
+    setIsInitialized(true);
+  }, [dispatch]);
+
+  useEffect(() => {
+    // Redirect to login if not authenticated after initialization
+    if (isInitialized && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isInitialized, isAuthenticated, router]);
+
+  // Show loading spinner while initializing
+  if (!isInitialized || (!isAuthenticated && isInitialized)) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   const getUserDisplayName = () => {
     if (!currentUser) return "User";
@@ -79,6 +115,32 @@ export const ZaloLayout: React.FC = () => {
     setSelectedFriendTab(tab);
     setShowUserProfile(false); // Hide profile when changing tabs
   };
+
+  const handleLogout = () => {
+    // Dispatch logout action to clear user data from store
+    dispatch(logout());
+    router.push('/login');
+  };
+
+  const handleViewAccountInfo = () => {
+    router.push('/profile');
+  };
+
+  // Create dropdown menu items
+  const menuItems = [
+    {
+      key: 'profile',
+      label: 'Thông tin tài khoản',
+      icon: <UserOutlined />,
+      onClick: handleViewAccountInfo,
+    },
+    {
+      key: 'logout',
+      label: 'Đăng xuất',
+      icon: <LogoutOutlined />,
+      onClick: handleLogout,
+    },
+  ];
 
   const renderMainContent = () => {
     if (showUserProfile && selectedUser) {
@@ -170,10 +232,16 @@ export const ZaloLayout: React.FC = () => {
     <div className="zalo-container">
       {/* Left Sidebar */}
       <div className="left-sidebar">
-        {/* User Avatar */}
-        <Avatar className="user-avatar" size={40}>
-          {getUserAvatar()}
-        </Avatar>
+        {/* User Avatar with Dropdown */}
+        <Dropdown
+          menu={{ items: menuItems }}
+          trigger={['click']}
+          placement="bottomLeft"
+        >
+          <Avatar className="user-avatar" size={40} style={{ cursor: 'pointer' }}>
+            {getUserAvatar()}
+          </Avatar>
+        </Dropdown>
 
         {/* Navigation Icons */}
         <div className="nav-icons">

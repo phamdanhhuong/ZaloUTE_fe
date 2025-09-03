@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { message } from "antd";
+import { useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { loginSuccess, setLoading } from "@/store/slices/userSlice";
 import { selectUserLoading } from "@/store/selectors";
@@ -7,6 +8,7 @@ import { login, type LoginRequest, type LoginResponse } from "../service";
 
 export const useLogin = () => {
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const loading = useAppSelector(selectUserLoading);
 
   const handleLogin = async (values: LoginRequest) => {
@@ -29,6 +31,10 @@ export const useLogin = () => {
       );
 
       message.success("Đăng nhập thành công!");
+      
+      // Navigate to home page after successful login
+      router.push('/');
+      
       return data;
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Đăng nhập thất bại";

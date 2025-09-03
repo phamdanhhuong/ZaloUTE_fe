@@ -1034,3 +1034,59 @@
   height: 8px;
   font-size: 0;
 }
+
+/* Avatar Dropdown Styles */
+.user-avatar:hover {
+  background-color: #0066cc !important;
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+}
+
+/* Custom dropdown menu styling */
+.ant-dropdown {
+  z-index: 1000;
+}
+
+.ant-dropdown-menu {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  padding: 8px 0;
+  min-width: 200px;
+}
+
+.ant-dropdown-menu-item {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.ant-dropdown-menu-item:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.ant-dropdown-menu-item .anticon {
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.ant-dropdown-menu-item:hover .anticon {
+  color: #0084ff;
+}
+
+/* Special styling for logout item */
+.ant-dropdown-menu-item[data-menu-id*="logout"]:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.ant-dropdown-menu-item[data-menu-id*="logout"]:hover .anticon {
+  color: #dc2626;
+}
