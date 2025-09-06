@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Input, Button, Avatar, Empty, Spin, Typography } from "antd";
+import { Input, Button, Avatar, Empty, Spin, Typography, Popover, Tabs } from "antd";
 import {
   SearchOutlined,
   TeamOutlined,
@@ -40,6 +40,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     stopTyping,
     joinConversation,
     isConnected,
+    sendReaction,
   } = useSocket();
   const {
     messages,
@@ -52,6 +53,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
 
   const [messageInput, setMessageInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -158,15 +160,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     );
   };
 
-  const handleSend = async () => {
-    if (!messageInput.trim() || sending || !conversation) return;
+
+  // Unified message sending handler for text, emoji, sticker
+  const handleSendMessage = async (content: string, type: "text" | "emoji" | "sticker" = "text") => {
+    if (!content.trim() || sending || !conversation) return;
 
     setSending(true);
     try {
       sendMessage({
         conversationId: conversation._id,
-        content: messageInput.trim(),
-        type: "text",
+        content: content.trim(),
+        type,
       });
       setMessageInput("");
 
@@ -179,6 +183,35 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
       console.error("Send message failed:", error);
     } finally {
       setSending(false);
+    }
+  };
+
+  // Old handleSend now just calls handleSendMessage for text
+  const handleSend = () => {
+    handleSendMessage(messageInput, "text");
+  };
+
+  // Dummy sticker list
+  const stickers = [
+    { id: "sticker1", url: "/public/file.svg" },
+    { id: "sticker2", url: "/public/globe.svg" },
+  ];
+
+  // Dummy emoji list
+  const emojis = ["😀", "😂", "😍", "👍", "🎉", "😢", "😡", "❤️"];
+  // Chọn emoji thì chèn vào input, chọn sticker thì gửi luôn message type 'sticker'
+  // handleSendReaction now only inserts emoji or calls handleSendMessage for sticker
+  const handleSendReaction = (reaction: { type: "emoji" | "sticker"; value: string }) => {
+    if (!conversation || !currentUser) return;
+    if (reaction.type === "emoji") {
+      setMessageInput((prev) => prev + reaction.value);
+      setShowEmojiPicker(false);
+      return;
+    }
+    if (reaction.type === "sticker") {
+      handleSendMessage(reaction.value, "sticker");
+      setShowEmojiPicker(false);
+      return;
     }
   };
 
@@ -409,11 +442,56 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
             disabled={!isConnected}
           />
 
-          <Button
-            type="text"
-            icon={<SmileOutlined />}
-            className={styles.inputAction}
-          />
+          <Popover
+            content={
+              <Tabs
+                defaultActiveKey="emoji"
+                items={[{
+                  key: "emoji",
+                  label: "Emoji",
+                  children: (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxWidth: 220 }}>
+                      {emojis.map((emoji) => (
+                        <span
+                          key={emoji}
+                          style={{ fontSize: 24, cursor: "pointer" }}
+                          onClick={() => handleSendReaction({ type: "emoji", value: emoji })}
+                        >
+                          {emoji}
+                        </span>
+                      ))}
+                    </div>
+                  ),
+                }, {
+                  key: "sticker",
+                  label: "Sticker",
+                  children: (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxWidth: 220 }}>
+                      {stickers.map((sticker) => (
+                        <img
+                          key={sticker.id}
+                          src={sticker.url}
+                          alt={sticker.id}
+                          style={{ width: 40, height: 40, cursor: "pointer" }}
+                          onClick={() => handleSendReaction({ type: "sticker", value: sticker.id })}
+                        />
+                      ))}
+                    </div>
+                  ),
+                }]}
+              />
+            }
+            trigger="click"
+            open={showEmojiPicker}
+            onOpenChange={setShowEmojiPicker}
+            placement="topRight"
+          >
+            <Button
+              type="text"
+              icon={<SmileOutlined />}
+              className={styles.inputAction}
+            />
+          </Popover>
 
           <Button
             type="primary"

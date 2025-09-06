@@ -1,4 +1,5 @@
-import { io, Socket } from "socket.io-client";
+import { io } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 
 export interface SocketMessage {
   _id: string;
@@ -12,7 +13,7 @@ export interface SocketMessage {
     avatarUrl: string;
   };
   content: string;
-  type: "text" | "image" | "file";
+  type: "text" | "image" | "file" | "emoji" | "sticker";
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
@@ -32,7 +33,7 @@ export interface SendMessageData {
   conversationId?: string;
   receiverId?: string;
   content: string;
-  type?: "text" | "image" | "file";
+  type?: "text" | "image" | "file" | "emoji" | "sticker";
 }
 
 export interface GetMessagesData {
@@ -43,6 +44,13 @@ export interface GetMessagesData {
 
 export interface TypingData {
   conversationId: string;
+}
+export interface SendReactionData {
+  messageId: string;
+  userId: string;
+  type: string;
+  conversationId: string;
+  value: string;
 }
 
 export const SOCKET_EVENTS = {
@@ -63,6 +71,9 @@ export const SOCKET_EVENTS = {
   USER_OFFLINE: "user_offline",
   TYPING_START: "typing_start",
   TYPING_STOP: "typing_stop",
+
+  // Reaction events
+  ADD_REACTION: "add_reaction",
 
   // Error events
   ERROR: "socket_error",
@@ -93,16 +104,19 @@ class SocketService {
         resolve();
       });
 
-      this.socket.on("connect_error", (error) => {
+
+      this.socket.on("connect_error", (error: any) => {
         console.error("Socket connection error:", error);
         reject(error);
       });
 
-      this.socket.on(SOCKET_EVENTS.CONNECTION_SUCCESS, (data) => {
+
+      this.socket.on(SOCKET_EVENTS.CONNECTION_SUCCESS, (data: any) => {
         console.log("Connection successful:", data);
       });
 
-      this.socket.on(SOCKET_EVENTS.ERROR, (error) => {
+
+      this.socket.on(SOCKET_EVENTS.ERROR, (error: any) => {
         console.error("Socket error:", error);
       });
     });
@@ -196,6 +210,18 @@ class SocketService {
       this.socket!.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId });
     } catch (error) {
       console.error("Failed to leave conversation:", error);
+      throw error;
+    }
+  }
+
+  // Send reaction (emoji/sticker)
+  async sendReaction(data: SendReactionData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.ADD_REACTION, data);
+      console.log('[DEBUG] Sent ADD_REACTION:', data);
+    } catch (error) {
+      console.error('Failed to send reaction:', error);
       throw error;
     }
   }

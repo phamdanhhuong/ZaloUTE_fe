@@ -18,7 +18,8 @@ import socketService, {
   SendMessageData, 
   GetMessagesData,
   SocketMessage,
-  SocketConversation
+  SocketConversation,
+  SendReactionData
 } from '@/infrastructure/socket/socketService';
 
 export const useSocket = () => {
@@ -169,6 +170,16 @@ export const useSocket = () => {
     }
   }, [isConnected]);
 
+  // Send reaction
+  const sendReaction = useCallback(async (data: SendReactionData) => {
+    try {
+      await socketService.sendReaction(data);
+    } catch (error) {
+      console.error('Failed to send reaction:', error);
+      dispatch(setError('Failed to send reaction'));
+    }
+  }, [dispatch]);
+
   // Auto connect when token is available
   useEffect(() => {
     if (token && !isConnected) {
@@ -200,5 +211,6 @@ export const useSocket = () => {
     leaveConversation,
     startTyping,
     stopTyping,
+    sendReaction,
   };
 };
