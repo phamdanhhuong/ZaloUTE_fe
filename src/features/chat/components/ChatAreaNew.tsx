@@ -57,7 +57,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
 
   // Get messages for active conversation
   const conversationMessages = activeConversationId
-    ? messages[activeConversationId] || []
+    ? [...(messages[activeConversationId] || [])].reverse()
     : [];
 
   const scrollToBottom = () => {
