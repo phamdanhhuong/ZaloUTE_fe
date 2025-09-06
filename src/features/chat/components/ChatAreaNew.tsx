@@ -17,7 +17,10 @@ import { useSocket } from "../hooks/useSocket";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import { setActiveConversationId } from "@/store/slices/chatSlice";
-import { SocketMessage, SocketConversation } from "@/infrastructure/socket/socketService";
+import {
+  SocketMessage,
+  SocketConversation,
+} from "@/infrastructure/socket/socketService";
 import styles from "./ChatAreaNew.module.css";
 
 const { Text, Title } = Typography;
@@ -27,16 +30,23 @@ interface ChatAreaProps {
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
-  console.log('ChatAreaNew received conversation:', conversation);
-  
+  console.log("ChatAreaNew received conversation:", conversation);
+
   const dispatch = useDispatch();
-  const { sendMessage, getMessages, startTyping, stopTyping, joinConversation, isConnected } = useSocket();
-  const { 
-    messages, 
-    activeConversationId, 
-    typingUsers, 
-    onlineUsers, 
-    isLoading 
+  const {
+    sendMessage,
+    getMessages,
+    startTyping,
+    stopTyping,
+    joinConversation,
+    isConnected,
+  } = useSocket();
+  const {
+    messages,
+    activeConversationId,
+    typingUsers,
+    onlineUsers,
+    isLoading,
   } = useSelector((state: RootState) => state.chat);
   const { user: currentUser } = useSelector((state: RootState) => state.user);
 
@@ -46,7 +56,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get messages for active conversation
-  const conversationMessages = activeConversationId ? messages[activeConversationId] || [] : [];
+  const conversationMessages = activeConversationId
+    ? messages[activeConversationId] || []
+    : [];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -59,42 +71,67 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   // Set active conversation and load messages
   useEffect(() => {
     if (conversation && conversation._id !== activeConversationId) {
-      console.log('Setting active conversation:', conversation._id);
+      console.log("Setting active conversation:", conversation._id);
       dispatch(setActiveConversationId(conversation._id));
-      
+
       // Use async functions properly
       const initializeConversation = async () => {
         try {
-          console.log('Joining conversation and loading messages for:', conversation._id);
+          console.log(
+            "Joining conversation and loading messages for:",
+            conversation._id
+          );
           await joinConversation(conversation._id);
           await getMessages({ conversationId: conversation._id, limit: 50 });
         } catch (error) {
-          console.error('Failed to initialize conversation:', error);
+          console.error("Failed to initialize conversation:", error);
         }
       };
 
       initializeConversation();
     }
-  }, [conversation, activeConversationId, dispatch, joinConversation, getMessages]);
+  }, [
+    conversation,
+    activeConversationId,
+    dispatch,
+    joinConversation,
+    getMessages,
+  ]);
 
   // Load messages when socket reconnects
   useEffect(() => {
-    if (isConnected && activeConversationId && activeConversationId === conversation?._id) {
+    if (
+      isConnected &&
+      activeConversationId &&
+      activeConversationId === conversation?._id
+    ) {
       // Rejoin conversation and reload messages when socket reconnects
-      console.log('Socket reconnected, rejoining conversation:', activeConversationId);
-      
+      console.log(
+        "Socket reconnected, rejoining conversation:",
+        activeConversationId
+      );
+
       const reconnectConversation = async () => {
         try {
           await joinConversation(activeConversationId);
-          await getMessages({ conversationId: activeConversationId, limit: 50 });
+          await getMessages({
+            conversationId: activeConversationId,
+            limit: 50,
+          });
         } catch (error) {
-          console.error('Failed to reconnect conversation:', error);
+          console.error("Failed to reconnect conversation:", error);
         }
       };
 
       reconnectConversation();
     }
-  }, [isConnected, activeConversationId, conversation?._id, joinConversation, getMessages]);
+  }, [
+    isConnected,
+    activeConversationId,
+    conversation?._id,
+    joinConversation,
+    getMessages,
+  ]);
 
   const getConversationName = () => {
     if (!conversation) return "";
@@ -105,7 +142,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     }
 
     // Fallback logic
-    if (conversation.type === 'group') {
+    if (conversation.type === "group") {
       return `Nhóm ${conversation.participants?.length || 0} thành viên`;
     }
 
@@ -113,7 +150,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   };
 
   const getConversationAvatar = () => {
-
     const name = getConversationName();
     return (
       <Avatar size={40} className={styles.avatar}>
@@ -130,10 +166,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
       sendMessage({
         conversationId: conversation._id,
         content: messageInput.trim(),
-        type: 'text'
+        type: "text",
       });
       setMessageInput("");
-      
+
       // Stop typing when message is sent
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -155,12 +191,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     // Handle typing indicators
     if (value.trim()) {
       startTyping(conversation._id);
-      
+
       // Clear existing timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      
+
       // Set new timeout to stop typing after 3 seconds of inactivity
       typingTimeoutRef.current = setTimeout(() => {
         stopTyping(conversation._id);
@@ -182,9 +218,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
 
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString('vi-VN', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return date.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -192,7 +228,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     if (message.sender && message.sender.firstName && message.sender.lastName) {
       return `${message.sender.firstName} ${message.sender.lastName}`.trim();
     }
-    return message.sender?.email || 'Unknown User';
+    return message.sender?.email || "Unknown User";
   };
 
   const isCurrentUserMessage = (message: SocketMessage) => {
@@ -212,9 +248,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
       <UserAvatar
         user={{
           id: message.sender._id,
-          username: message.sender.username || '',
-          firstname: message.sender.firstname,
-          lastname: message.sender.lastname,
+          username: message.sender.username || "",
+          firstname: message.sender.firstName,
+          lastname: message.sender.lastName,
           avatarUrl: message.sender.avatarUrl,
         }}
         size="small"
@@ -225,7 +261,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
 
   // Get typing users for current conversation (excluding current user)
   const currentTypingUsers = typingUsers.filter(
-    user => user.conversationId === conversation?._id && user.userId !== currentUser?.id
+    (user) =>
+      user.conversationId === conversation?._id &&
+      user.userId !== currentUser?.id
   );
 
   if (!conversation) {
@@ -251,14 +289,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
             <Title level={5} className={styles.participantName}>
               {getConversationName()}
             </Title>
-            {conversation.type === 'group' && (
+            {conversation.type === "group" && (
               <Text type="secondary" className={styles.participantStatus}>
                 {conversation.participants.length} thành viên
               </Text>
             )}
           </div>
         </div>
-        
+
         <div className={styles.chatActions}>
           <Button
             type="text"
@@ -292,9 +330,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
           <div className={styles.messagesList}>
             {conversationMessages.map((message, index) => {
               const isCurrentUser = isCurrentUserMessage(message);
-              const showAvatar = index === 0 || 
-                conversationMessages[index - 1].sender?._id !== message.sender?._id;
-              
+              const showAvatar =
+                index === 0 ||
+                conversationMessages[index - 1].sender?._id !==
+                  message.sender?._id;
+
               return (
                 <div
                   key={message._id}
@@ -302,17 +342,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
                     isCurrentUser ? styles.currentUser : styles.otherUser
                   }`}
                 >
-                  {!isCurrentUser && showAvatar && 
-                    getMessageSenderAvatar(message)
-                  }
-                  
+                  {!isCurrentUser &&
+                    showAvatar &&
+                    getMessageSenderAvatar(message)}
+
                   <div className={styles.messageContent}>
                     {!isCurrentUser && showAvatar && (
                       <Text className={styles.senderName}>
                         {getMessageSenderName(message)}
                       </Text>
                     )}
-                    
+
                     <div className={styles.messageBubble}>
                       <div className={styles.messageText}>
                         {message.content}
@@ -328,7 +368,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
                 </div>
               );
             })}
-            
+
             {/* Typing indicator */}
             {currentTypingUsers.length > 0 && (
               <div className={styles.typingIndicator}>
@@ -344,7 +384,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
                 </div>
               </div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -358,7 +398,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
             icon={<PaperClipOutlined />}
             className={styles.inputAction}
           />
-          
+
           <Input.TextArea
             value={messageInput}
             onChange={handleInputChange}
@@ -368,13 +408,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
             className={styles.textInput}
             disabled={!isConnected}
           />
-          
+
           <Button
             type="text"
             icon={<SmileOutlined />}
             className={styles.inputAction}
           />
-          
+
           <Button
             type="primary"
             icon={<SendOutlined />}
@@ -384,7 +424,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
             className={styles.sendButton}
           />
         </div>
-        
+
         {!isConnected && (
           <div className={styles.connectionStatus}>
             <Text type="danger">Đã mất kết nối với máy chủ</Text>

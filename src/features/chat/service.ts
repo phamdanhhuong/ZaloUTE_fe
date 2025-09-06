@@ -5,7 +5,7 @@ export interface Message {
   content: string;
   senderId: string;
   conversationId: string;
-  messageType: 'text' | 'image' | 'file' | 'sticker';
+  messageType: "text" | "image" | "file" | "sticker";
   createdAt: string;
   updatedAt: string;
   sender: {
@@ -39,12 +39,13 @@ interface BackendUser {
   firstname: string;
   lastname: string;
   username?: string;
+  avatarUrl?: string;
 }
 
 interface BackendConversation {
   _id: string;
   participants: BackendUser[]; // Direct array of populated User documents
-  type: 'private' | 'group';
+  type: "private" | "group";
   name?: string;
   avatar?: string;
   createdAt: string;
@@ -56,7 +57,7 @@ export interface Conversation {
   id?: string; // For compatibility
   name?: string;
   isGroup?: boolean;
-  type?: 'private' | 'group'; // MongoDB field
+  type?: "private" | "group"; // MongoDB field
   groupName?: string; // MongoDB field for group conversations
   createdAt: string;
   updatedAt: string;
@@ -69,7 +70,7 @@ export interface ConversationParticipant {
   id: string;
   conversationId: string;
   userId: string;
-  role: 'admin' | 'member';
+  role: "admin" | "member";
   joinedAt: string;
   user: {
     id: string;
@@ -83,7 +84,7 @@ export interface ConversationParticipant {
 export interface SendMessageRequest {
   conversationId: string;
   content: string;
-  messageType?: 'text' | 'image' | 'file' | 'sticker';
+  messageType?: "text" | "image" | "file" | "sticker";
 }
 
 export interface CreateConversationRequest {
@@ -108,14 +109,18 @@ export const getConversations = async (): Promise<Conversation[]> => {
   try {
     const response = await axiosClient.get("/conversation/list");
     console.log("Get conversations response:", response);
-    
+
     // The axios interceptor extracts data from wrapped responses,
     // so response is the data directly (not response.data)
     if (Array.isArray(response)) {
       console.log("Parsed conversations data:", response);
       return response as Conversation[];
     } else {
-      console.error("Unexpected response format - expected array, got:", typeof response, response);
+      console.error(
+        "Unexpected response format - expected array, got:",
+        typeof response,
+        response
+      );
       return [];
     }
   } catch (error) {
@@ -131,10 +136,10 @@ export const createConversation = async (
   try {
     const response = await axiosClient.post("/conversation", payload);
     console.log("Create conversation response:", response);
-    
+
     let data;
-    if (response && typeof response === 'object') {
-      if ('data' in response && response.data) {
+    if (response && typeof response === "object") {
+      if ("data" in response && response.data) {
         console.log("Response data:", response.data);
         data = response.data.data || response.data;
       } else {
@@ -143,13 +148,13 @@ export const createConversation = async (
     } else {
       throw new Error("Invalid response format");
     }
-    
+
     console.log("Parsed conversation data:", data);
-    
+
     if (!data) {
       throw new Error("No data received from server");
     }
-    
+
     return data as Conversation;
   } catch (error) {
     console.error("Create conversation failed:", error);
@@ -162,11 +167,14 @@ export const getMessages = async (
   params: GetMessagesRequest
 ): Promise<GetMessagesResponse> => {
   try {
-    console.log('Calling getMessages API with params:', params);
-    const response = await axiosClient.get(`/conversation/${params.conversationId}/messages`, {
-      params: { limit: params.limit, offset: params.offset }
-    });
-    console.log('getMessages API response:', response);
+    console.log("Calling getMessages API with params:", params);
+    const response = await axiosClient.get(
+      `/conversation/${params.conversationId}/messages`,
+      {
+        params: { limit: params.limit, offset: params.offset },
+      }
+    );
+    console.log("getMessages API response:", response);
     return response as unknown as GetMessagesResponse;
   } catch (error) {
     console.error("Get messages failed:", error);
@@ -181,12 +189,12 @@ export const sendMessage = async (
   try {
     const response = await axiosClient.post("/message", payload);
     let data;
-    if (response && typeof response === 'object') {
-      data = ('data' in response && response.data) ? response.data : response;
+    if (response && typeof response === "object") {
+      data = "data" in response && response.data ? response.data : response;
     } else {
       throw new Error("Invalid response format");
     }
-    
+
     return data as Message;
   } catch (error) {
     console.error("Send message failed:", error);
@@ -210,15 +218,17 @@ export const addReaction = async (
   emoji: string
 ): Promise<MessageReaction> => {
   try {
-    const response = await axiosClient.post(`/message/${messageId}/reaction`, { emoji });
-    
+    const response = await axiosClient.post(`/message/${messageId}/reaction`, {
+      emoji,
+    });
+
     let data;
-    if (response && typeof response === 'object') {
-      data = ('data' in response && response.data) ? response.data : response;
+    if (response && typeof response === "object") {
+      data = "data" in response && response.data ? response.data : response;
     } else {
       throw new Error("Invalid response format");
     }
-    
+
     return data as MessageReaction;
   } catch (error) {
     console.error("Add reaction failed:", error);
@@ -242,20 +252,22 @@ export const searchMessages = async (
   query: string
 ): Promise<Message[]> => {
   try {
-    const response = await axiosClient.get(`/conversation/${conversationId}/search`, {
-      params: { q: query }
-    });
+    const response = await axiosClient.get(
+      `/conversation/${conversationId}/search`,
+      {
+        params: { q: query },
+      }
+    );
     let data;
-    if (response && typeof response === 'object') {
-      data = ('data' in response && response.data) ? response.data : response;
+    if (response && typeof response === "object") {
+      data = "data" in response && response.data ? response.data : response;
     } else {
       throw new Error("Invalid response format");
     }
-    
+
     return data as Message[];
   } catch (error) {
     console.error("Search messages failed:", error);
     throw error;
   }
 };
-

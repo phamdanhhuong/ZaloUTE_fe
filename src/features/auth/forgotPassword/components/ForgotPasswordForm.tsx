@@ -5,11 +5,15 @@ import ResetPasswordStep from "./ResetPasswordStep";
 import SuccessStep from "./SuccessStep";
 import { Card, message } from "antd";
 import styles from "@/app/register/page.module.css";
-import { sendForgotPasswordEmail, verifyForgotPasswordOTP, resetPassword } from "../service";
+import {
+  sendForgotPasswordEmail,
+  verifyForgotPasswordOTP,
+  resetPassword,
+} from "../service";
 
 // Các bước của flow quên mật khẩu
 const steps = ["email", "otp", "reset", "success"] as const;
-type Step = typeof steps[number];
+type Step = (typeof steps)[number];
 
 const ForgotPasswordForm: React.FC = () => {
   const [step, setStep] = useState<Step>("email");
@@ -35,7 +39,7 @@ const ForgotPasswordForm: React.FC = () => {
               const res = await sendForgotPasswordEmail(email);
               console.log("Forgot password email response:", res);
               // Nếu response có statusCode 201 hoặc message thành công thì chuyển bước
-              if ((res && (res.statusCode === 201 || res.message?.toLowerCase().includes("success")))) {
+              if (res && res.message?.toLowerCase().includes("success")) {
                 setEmail(email);
                 handleNext();
               } else {
@@ -55,14 +59,12 @@ const ForgotPasswordForm: React.FC = () => {
           onNext={async (otpValue) => {
             setLoading(true);
             try {
-              const res = await verifyForgotPasswordOTP({ email, otp: otpValue });
+              const res = await verifyForgotPasswordOTP({
+                email,
+                otp: otpValue,
+              });
               console.log("Verify OTP response:", res);
-              if (
-                res &&
-                (res.statusCode === 201 ||
-                  res.statusCode === 200 ||
-                  res.message?.toLowerCase().includes("success"))
-              ) {
+              if (res && res.message?.toLowerCase().includes("success")) {
                 setOtp(otpValue);
                 handleNext();
               } else {
@@ -89,13 +91,10 @@ const ForgotPasswordForm: React.FC = () => {
               console.log("[DEBUG] Params to resetPassword:", params);
               const res = await resetPassword(params);
               console.log("[DEBUG] Response from resetPassword:", res);
-              if (
-                res &&
-                (res.statusCode === 201 ||
-                  res.statusCode === 200 ||
-                  res.message?.toLowerCase().includes("success"))
-              ) {
-                console.log("[DEBUG] Password reset successful, moving to next step");
+              if (res && res.message?.toLowerCase().includes("success")) {
+                console.log(
+                  "[DEBUG] Password reset successful, moving to next step"
+                );
                 message.success("Đổi mật khẩu thành công!");
                 handleNext();
               } else {

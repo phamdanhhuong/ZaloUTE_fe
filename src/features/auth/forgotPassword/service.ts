@@ -1,4 +1,3 @@
-
 import axiosClient from "@/infrastructure/http/axiosClient";
 
 export interface ForgotPasswordEmailData {
@@ -26,9 +25,11 @@ export const sendForgotPasswordEmail = async (
   email: string
 ): Promise<ForgotPasswordResponse> => {
   try {
-    const response = await axiosClient.post("/user/forgot-password", { email });
+    const response: any = await axiosClient.post("/user/forgot-password", {
+      email,
+    });
     // axiosClient interceptor đã trả về response.data hoặc response.data.data
-    return response;
+    return response as ForgotPasswordResponse;
   } catch (error) {
     console.error("Send forgot password email error:", error);
     throw error;
@@ -40,8 +41,11 @@ export const verifyForgotPasswordOTP = async (
   data: ForgotPasswordOTPData
 ): Promise<ForgotPasswordResponse> => {
   try {
-    const response = await axiosClient.post("/user/forgot-password/verify-otp", data);
-    return response;
+    const response: any = await axiosClient.post(
+      "/user/forgot-password/verify-otp",
+      data
+    );
+    return response as ForgotPasswordResponse;
   } catch (error) {
     console.error("Verify forgot password OTP error:", error);
     throw error;
@@ -53,8 +57,11 @@ export const resetPassword = async (
   data: ResetPasswordData
 ): Promise<ForgotPasswordResponse> => {
   try {
-    const response = await axiosClient.post("/user/forgot-password/reset", data);
-    return response;
+    const response: any = await axiosClient.post(
+      "/user/forgot-password/reset",
+      data
+    );
+    return response as ForgotPasswordResponse;
   } catch (error) {
     console.error("Reset password error:", error);
     throw error;
