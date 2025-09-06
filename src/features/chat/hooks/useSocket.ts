@@ -12,7 +12,8 @@ import {
   removeTypingUser,
   addOnlineUser,
   removeOnlineUser,
-  clearChatData
+  clearChatData,
+  updateMessageReactions
 } from '@/store/slices/chatSlice';
 import socketService, { 
   SendMessageData, 
@@ -83,6 +84,12 @@ export const useSocket = () => {
         dispatch(setError(error.message || 'Socket error occurred'));
       }));
 
+      // Reaction events
+      unsubscribers.push(socketService.onMessageReactionUpdated((data) => {
+        console.log('Received MESSAGE_REACTION_UPDATED:', data);
+        dispatch(updateMessageReactions(data));
+      }));
+
       unsubscribeRefs.current = unsubscribers;
 
       // Load initial data - temporarily commented out for debugging
@@ -131,6 +138,7 @@ export const useSocket = () => {
   // Join conversation
   const joinConversation = useCallback(async (conversationId: string) => {
     try {
+      console.log('Joining socket room:', conversationId);
       await socketService.joinConversation(conversationId);
     } catch (error) {
       console.error('Failed to join conversation:', error);

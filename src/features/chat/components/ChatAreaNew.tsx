@@ -1,6 +1,16 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+// Reaction types and icons (Messenger style)
+const REACTION_TYPES = [
+  { type: "like", icon: "👍" },
+  { type: "love", icon: "❤️" },
+  { type: "haha", icon: "😂" },
+  { type: "wow", icon: "😮" },
+  { type: "sad", icon: "😢" },
+  { type: "angry", icon: "😡" },
+];
+
 import { Input, Button, Avatar, Empty, Spin, Typography, Popover, Tabs } from "antd";
 import {
   SearchOutlined,
@@ -54,6 +64,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const [messageInput, setMessageInput] = useState("");
   const [sending, setSending] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showReactionPopup, setShowReactionPopup] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -198,6 +209,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   ];
 
   // Dummy emoji list
+
+  // Reaction popup state (messageId) and timer for auto-hide
+  const reactionPopupTimer = useRef<NodeJS.Timeout | null>(null);
   const emojis = ["😀", "😂", "😍", "👍", "🎉", "😢", "😡", "❤️"];
   // Chọn emoji thì chèn vào input, chọn sticker thì gửi luôn message type 'sticker'
   // handleSendReaction now only inserts emoji or calls handleSendMessage for sticker
@@ -361,40 +375,134 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
           </div>
         ) : (
           <div className={styles.messagesList}>
+
             {conversationMessages.map((message, index) => {
               const isCurrentUser = isCurrentUserMessage(message);
               const showAvatar =
                 index === 0 ||
-                conversationMessages[index - 1].sender?._id !==
-                  message.sender?._id;
+                conversationMessages[index - 1].sender?._id !== message.sender?._id;
+
+              // Handler: send reaction
+              const handleReact = (reactionType: string) => {
+                if (!currentUser) return;
+                sendReaction({
+                  messageId: message._id,
+                  userId: currentUser.id,
+                  type: reactionType,
+                  conversationId: message.conversation,
+                  value: reactionType,
+                });
+                setShowReactionPopup(null);
+              };
+
+              // Reaction placeholder hover handlers
+              const handlePlaceholderEnter = () => {
+                if (reactionPopupTimer.current) clearTimeout(reactionPopupTimer.current);
+                setShowReactionPopup(message._id);
+              };
+              const handlePlaceholderLeave = () => {
+                // Auto-hide popup sau 2.5s nếu không hover lại
+                reactionPopupTimer.current = setTimeout(() => {
+                  setShowReactionPopup((cur) => (cur === message._id ? null : cur));
+                }, 1500);
+              };
+              const handlePopupEnter = () => {
+                if (reactionPopupTimer.current) clearTimeout(reactionPopupTimer.current);
+                setShowReactionPopup(message._id);
+              };
+              const handlePopupLeave = () => {
+                reactionPopupTimer.current = setTimeout(() => {
+                  setShowReactionPopup((cur) => (cur === message._id ? null : cur));
+                }, 1500);
+              };
 
               return (
                 <div
                   key={message._id}
-                  className={`${styles.messageWrapper} ${
-                    isCurrentUser ? styles.currentUser : styles.otherUser
-                  }`}
+                  className={`${styles.messageWrapper} ${isCurrentUser ? styles.currentUser : styles.otherUser}`}
                 >
-                  {!isCurrentUser &&
-                    showAvatar &&
-                    getMessageSenderAvatar(message)}
-
+                  {!isCurrentUser && showAvatar && getMessageSenderAvatar(message)}
                   <div className={styles.messageContent}>
                     {!isCurrentUser && showAvatar && (
-                      <Text className={styles.senderName}>
-                        {getMessageSenderName(message)}
-                      </Text>
+                      <Text className={styles.senderName}>{getMessageSenderName(message)}</Text>
                     )}
-
                     <div className={styles.messageBubble}>
-                      <div className={styles.messageText}>
-                        {message.content}
-                      </div>
+                      <div className={styles.messageText}>{message.content}</div>
                       <div className={styles.messageTime}>
                         {formatMessageTime(message.createdAt)}
                         {isCurrentUser && message.isRead && (
                           <CheckCircleOutlined className={styles.readIcon} />
                         )}
+                      </div>
+                      {/* Reaction display + placeholder icon */}
+                      <div style={{ position: 'relative', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {/* Hiển thị reaction đã thả (nếu có) */}
+                        {message.reactions &&
+                          typeof message.reactions === 'object' &&
+                          Object.values(message.reactions).some((r: any) => r && r.count > 0) && (
+                            <div className={styles.reactionSummary} style={{ display: 'flex', gap: 2, alignItems: 'center', background: '#f5f5f5', borderRadius: 16, padding: '0 6px', fontSize: 15, border: '1px solid #eee' }}>
+                              {REACTION_TYPES.filter(rt => message.reactions && message.reactions[rt.type]?.count > 0).map(rt => (
+                                <span key={rt.type} style={{ marginRight: 2 }}>{rt.icon}</span>
+                              ))}
+                              <span style={{ fontSize: 13, color: '#888', marginLeft: 2 }}>
+                                {Object.values(message.reactions).reduce((sum: number, r: any) => sum + ((r && r.count) || 0), 0)}
+                              </span>
+                            </div>
+                        )}
+                        {/* Reaction placeholder icon */}
+                        <div
+                          className={styles.reactionPlaceholder}
+                          onMouseEnter={handlePlaceholderEnter}
+                          onMouseLeave={handlePlaceholderLeave}
+                          style={{ display: 'inline-block', position: 'relative' }}
+                        >
+                          <span
+                            style={{
+                              border: '1px solid #ccc',
+                              borderRadius: '50%',
+                              padding: 2,
+                              color: '#bbb',
+                              background: '#fff',
+                              fontSize: 18,
+                              cursor: 'pointer',
+                              transition: 'border 0.2s',
+                            }}
+                          >
+                            👍
+                          </span>
+                          {/* Reaction popup */}
+                          {showReactionPopup === message._id && (
+                            <div
+                              className={styles.reactionPopup}
+                              style={{
+                                position: 'absolute',
+                                zIndex: 1000,
+                                background: '#fff',
+                                border: '1px solid #eee',
+                                borderRadius: 24,
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                                padding: '4px 8px',
+                                display: 'flex',
+                                gap: 6,
+                                bottom: 32,
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                              }}
+                              onMouseEnter={handlePopupEnter}
+                              onMouseLeave={handlePopupLeave}
+                            >
+                              {REACTION_TYPES.map((r) => (
+                                <span
+                                  key={r.type}
+                                  style={{ fontSize: 22, cursor: 'pointer', transition: 'transform 0.1s' }}
+                                  onClick={() => handleReact(r.type)}
+                                >
+                                  {r.icon}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

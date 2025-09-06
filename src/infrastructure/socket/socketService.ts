@@ -1,6 +1,4 @@
-import { io } from "socket.io-client";
-import type { Socket } from "socket.io-client";
-
+import io, { Socket } from "socket.io-client";
 export interface SocketMessage {
   _id: string;
   conversation: string;
@@ -17,6 +15,9 @@ export interface SocketMessage {
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
+  reactions?: {
+    [type: string]: { count: number; userIds: string[] }
+  };
 }
 
 export interface SocketConversation {
@@ -74,6 +75,7 @@ export const SOCKET_EVENTS = {
 
   // Reaction events
   ADD_REACTION: "add_reaction",
+  MESSAGE_REACTION_UPDATED: "message_reaction_updated",
 
   // Error events
   ERROR: "socket_error",
@@ -288,6 +290,11 @@ class SocketService {
     return () => this.socket?.off(SOCKET_EVENTS.TYPING_STOP, callback);
   }
 
+  onMessageReactionUpdated(callback: (data: { messageId: string; conversationId: string; reactions: any }) => void): () => void {
+    if (!this.socket) throw new Error("Socket not connected");
+    this.socket.on(SOCKET_EVENTS.MESSAGE_REACTION_UPDATED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.MESSAGE_REACTION_UPDATED, callback);
+  }
   onError(callback: (error: any) => void): () => void {
     if (!this.socket) throw new Error("Socket not connected");
     this.socket.on(SOCKET_EVENTS.ERROR, callback);

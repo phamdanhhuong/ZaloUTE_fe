@@ -71,6 +71,7 @@ export const chatSlice = createSlice({
       state.activeConversationId = action.payload;
     },
 
+
     // Messages
     setMessages: (state, action: PayloadAction<{ conversationId: string; messages: SocketMessage[] }>) => {
       const { conversationId, messages } = action.payload;
@@ -110,6 +111,18 @@ export const chatSlice = createSlice({
       );
       
       state.messages[conversationId] = [...newMessages, ...existingMessages];
+    },
+
+    // Real-time reaction update
+    updateMessageReactions: (state, action: PayloadAction<{ messageId: string; conversationId: string; reactions: any }>) => {
+      const { messageId, conversationId, reactions } = action.payload;
+      const msgs = state.messages[conversationId];
+      if (msgs) {
+        const msg = msgs.find(m => m._id === messageId);
+        if (msg) {
+          msg.reactions = reactions;
+        }
+      }
     },
 
     // Typing indicators
@@ -168,6 +181,7 @@ export const {
   addOnlineUser,
   removeOnlineUser,
   clearChatData,
+  updateMessageReactions,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;
