@@ -68,17 +68,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get messages for active conversation
-  const conversationMessages = activeConversationId
-    ? messages[activeConversationId] || []
-    : [];
+  // Get messages for active conversation and ensure correct order
+  const conversationMessages = React.useMemo(() => {
+    if (!activeConversationId || !messages[activeConversationId]) {
+      return [];
+    }
+    
+    return [...messages[activeConversationId]].sort((a, b) => {
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      return dateA.getTime() - dateB.getTime();
+    });
+  }, [activeConversationId, messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Scroll to bottom when messages change, with a small delay to ensure DOM update
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
   }, [conversationMessages]);
 
   // Set active conversation and load messages
@@ -96,6 +107,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
           );
           await joinConversation(conversation._id);
           await getMessages({ conversationId: conversation._id, limit: 50 });
+          
+          // Force scroll to bottom after loading messages
+          setTimeout(() => {
+            scrollToBottom();
+          }, 300);
         } catch (error) {
           console.error("Failed to initialize conversation:", error);
         }
@@ -131,6 +147,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
             conversationId: activeConversationId,
             limit: 50,
           });
+          
+          // Force scroll to bottom after reconnecting
+          setTimeout(() => {
+            scrollToBottom();
+          }, 300);
         } catch (error) {
           console.error("Failed to reconnect conversation:", error);
         }
