@@ -70,7 +70,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
 
   // Get messages for active conversation
   const conversationMessages = activeConversationId
-    ? [...(messages[activeConversationId] || [])].reverse()
+    ? messages[activeConversationId] || []
     : [];
 
   const scrollToBottom = () => {
@@ -176,13 +176,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const handleSendMessage = async (content: string, type: "text" | "emoji" | "sticker" = "text") => {
     if (!content.trim() || sending || !conversation) return;
 
+    console.log("Sending message:", content, "to conversation:", conversation._id, "isConnected:", isConnected);
+    
     setSending(true);
     try {
-      sendMessage({
+      await sendMessage({
         conversationId: conversation._id,
         content: content.trim(),
         type,
       });
+      console.log("Message sent successfully");
       setMessageInput("");
 
       // Stop typing when message is sent
@@ -235,8 +238,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
 
     if (!conversation) return;
 
+    console.log("Input change, isConnected:", isConnected, "conversation:", conversation._id);
+
     // Handle typing indicators
     if (value.trim()) {
+      console.log("Starting typing for conversation:", conversation._id);
       startTyping(conversation._id);
 
       // Clear existing timeout
@@ -246,12 +252,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
 
       // Set new timeout to stop typing after 3 seconds of inactivity
       typingTimeoutRef.current = setTimeout(() => {
+        console.log("Stopping typing for conversation:", conversation._id);
         stopTyping(conversation._id);
       }, 3000);
     } else {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
+      console.log("Stopping typing (empty input) for conversation:", conversation._id);
       stopTyping(conversation._id);
     }
   };
