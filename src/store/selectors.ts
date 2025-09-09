@@ -6,6 +6,8 @@ export const selectToken = (state: RootState) => state.user.token;
 export const selectIsAuthenticated = (state: RootState) =>
   state.user.isAuthenticated;
 export const selectUserLoading = (state: RootState) => state.user.loading;
+export const selectIsInitialized = (state: RootState) =>
+  state.user.isInitialized;
 
 // Derived selectors
 export const selectUserFullName = (state: RootState) => {
