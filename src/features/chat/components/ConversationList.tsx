@@ -1,17 +1,25 @@
 "use client";
 
 import React, { useState } from "react";
-import { List, Avatar, Badge, Input, Button, Empty, Spin } from "antd";
+import { List, Avatar, Badge, Input, Button, Empty, Spin, Dropdown, Space, Typography } from "antd";
 import {
   SearchOutlined,
   TeamOutlined,
   PushpinOutlined,
+  PlusOutlined,
+  SettingOutlined,
+  CrownOutlined,
+  MoreOutlined,
 } from "@ant-design/icons";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useConversations } from "../hooks";
+import { CreateGroupModal } from "./CreateGroupModal";
+import { GroupSettingsModal } from "./GroupSettingsModal";
 import type { Conversation } from "../service";
 import { LoginUser } from "@/features/auth/login/service";
 import styles from "./ConversationList.module.css";
+
+const { Text } = Typography;
 
 interface ConversationListProps {
   activeConversationId?: string;
@@ -24,9 +32,12 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   onConversationSelect,
   currentUser,
 }) => {
-  const { loading, conversations } = useConversations();
+  const { loading, conversations, refreshConversations } = useConversations();
   const [searchText, setSearchText] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [showGroupSettingsModal, setShowGroupSettingsModal] = useState(false);
+  const [selectedGroupForSettings, setSelectedGroupForSettings] = useState<Conversation | null>(null);
 
   console.log('ConversationList currentUser prop:', currentUser); // Debug log
   console.log('ConversationList currentUser.id:', currentUser?.id); // Debug log
@@ -72,15 +83,38 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   };
 
   const getConversationAvatar = (conversation: Conversation) => {
+    // Nếu là group chat, hiển thị avatar group
     if (conversation.type === 'group' || conversation.isGroup) {
       const name = getConversationName(conversation);
       return (
-        <Avatar size={48} className={styles.avatar}>
-          {name.charAt(0).toUpperCase()}
-        </Avatar>
+        <div style={{ position: 'relative' }}>
+          <Avatar 
+            size={48} 
+            className={styles.avatar} 
+            src={conversation.avatar}
+            style={{ backgroundColor: '#1890ff' }}
+          >
+            {!conversation.avatar && <TeamOutlined />}
+          </Avatar>
+          {conversation.groupAdmin?._id === currentUser?.id && (
+            <CrownOutlined 
+              style={{ 
+                position: 'absolute', 
+                top: -2, 
+                right: -2, 
+                color: '#faad14',
+                fontSize: 12,
+                background: 'white',
+                borderRadius: '50%',
+                padding: 1
+              }} 
+            />
+          )}
+        </div>
       );
     }
 
+    // Nếu là chat 1-1, hiển thị avatar của người kia
     const otherParticipant = conversation.participants?.find(user => {
       const userId = user._id;
       return userId && userId !== currentUser?.id;
@@ -185,6 +219,63 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     });
   }, [conversations, searchText, activeTab]);
 
+  // Handle create group success
+  const handleCreateGroupSuccess = (groupId: string) => {
+    setShowCreateGroupModal(false);
+    refreshConversations();
+    // Optionally select the new group
+    const newGroup = conversations.find(c => c._id === groupId);
+    if (newGroup && onConversationSelect) {
+      onConversationSelect(newGroup);
+    }
+  };
+
+  const handleGroupSettingsClick = (conversation: Conversation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log('Opening group settings for:', conversation.name);
+    setSelectedGroupForSettings(conversation);
+    setShowGroupSettingsModal(true);
+  };
+
+  const handleConversationUpdate = (updatedConversation: Conversation) => {
+    refreshConversations();
+  };
+
+  const handleLeaveGroup = () => {
+    refreshConversations();
+    setSelectedGroupForSettings(null);
+    setShowGroupSettingsModal(false);
+  };
+
+  const getGroupActionMenu = (conversation: Conversation) => {
+    if (conversation.type !== 'group') return undefined;
+
+    const isAdmin = conversation.groupAdmin?._id === currentUser?.id;
+    const isMember = conversation.participants.some(p => p._id === currentUser?.id);
+
+    console.log('Group action menu for:', conversation.name, {
+      isAdmin,
+      isMember,
+      currentUserId: currentUser?.id,
+      groupAdminId: conversation.groupAdmin?._id
+    });
+
+    if (!isMember) return undefined;
+
+    return {
+      items: [
+        {
+          key: 'settings',
+          icon: <SettingOutlined />,
+          label: 'Cài đặt nhóm',
+          onClick: () => {
+            handleGroupSettingsClick(conversation, new MouseEvent('click') as any);
+          },
+        },
+      ],
+    };
+  };
+
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -239,6 +330,19 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         </button>
       </div>
 
+      {/* Create Group Button */}
+      <div style={{ padding: "8px 16px", marginBottom: 8 }}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => setShowCreateGroupModal(true)}
+          block
+          size="middle"
+        >
+          Tạo nhóm chat
+        </Button>
+      </div>
+
       {/* Conversation List */}
       <div className={styles.listContainer}>
         {loading ? (
@@ -283,12 +387,29 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                   <div className={styles.conversationInfo}>
                     <div className={styles.conversationHeader}>
                       <div className={styles.nameContainer}>
-                        {(conversation.type === 'group' || conversation.isGroup) && (
-                          <TeamOutlined className={styles.groupIcon} />
-                        )}
-                        <h3 className={styles.conversationName}>
-                          {getConversationName(conversation)}
-                        </h3>
+                        <div>
+                          <h3 className={styles.conversationName}>
+                            <Space>
+                              {(conversation.type === 'group' || conversation.isGroup) && (
+                                <TeamOutlined style={{ color: '#1890ff' }} />
+                              )}
+                              {getConversationName(conversation)}
+                              {conversation.groupAdmin?._id === currentUser?.id && (
+                                <CrownOutlined style={{ color: '#faad14', fontSize: 14 }} />
+                              )}
+                            </Space>
+                          </h3>
+                          {(conversation.type === 'group' || conversation.isGroup) && (
+                            <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                              {conversation.participants.length} thành viên
+                              {conversation.groupAdmin?._id === currentUser?.id && (
+                                <Text style={{ marginLeft: 4, color: '#faad14' }}>
+                                  • Bạn là nhóm trưởng
+                                </Text>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className={styles.timeAndBadge}>
@@ -303,6 +424,23 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                             size="small"
                             style={{ marginLeft: 8 }}
                           />
+                        )}
+                        
+                        {/* Group Settings Dropdown */}
+                        {(conversation.type === 'group' || conversation.isGroup) && (
+                          <Dropdown 
+                            menu={getGroupActionMenu(conversation)}
+                            trigger={['click']}
+                            placement="bottomRight"
+                          >
+                            <Button 
+                              type="text" 
+                              size="small" 
+                              icon={<MoreOutlined />}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ marginLeft: 4 }}
+                            />
+                          </Dropdown>
                         )}
                       </div>
                     </div>
@@ -328,6 +466,30 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           />
         )}
       </div>
+
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        visible={showCreateGroupModal}
+        onCancel={() => setShowCreateGroupModal(false)}
+        onSuccess={handleCreateGroupSuccess}
+      />
+
+      {/* Group Settings Modal */}
+      <GroupSettingsModal
+        visible={showGroupSettingsModal}
+        onCancel={() => {
+          setShowGroupSettingsModal(false);
+          setSelectedGroupForSettings(null);
+        }}
+        conversation={selectedGroupForSettings}
+        onConversationUpdate={handleConversationUpdate}
+        onLeaveGroup={handleLeaveGroup}
+        onGroupDissolved={() => {
+          setShowGroupSettingsModal(false);
+          setSelectedGroupForSettings(null);
+          refreshConversations();
+        }}
+      />
     </div>
   );
 };

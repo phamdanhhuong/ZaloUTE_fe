@@ -58,6 +58,17 @@ export const chatSlice = createSlice({
       state.conversations = action.payload;
     },
 
+    removeConversation: (state, action: PayloadAction<{ conversationId: string }>) => {
+      const { conversationId } = action.payload;
+      state.conversations = state.conversations.filter(conv => conv._id !== conversationId);
+      // Also remove messages for this conversation
+      delete state.messages[conversationId];
+      // If this was the active conversation, clear it
+      if (state.activeConversationId === conversationId) {
+        state.activeConversationId = null;
+      }
+    },
+
     addConversation: (state, action: PayloadAction<SocketConversation>) => {
       const existingIndex = state.conversations.findIndex(c => c._id === action.payload._id);
       if (existingIndex >= 0) {
@@ -172,6 +183,7 @@ export const {
   setError,
   setConversations,
   addConversation,
+  removeConversation,
   setActiveConversationId,
   setMessages,
   addMessage,

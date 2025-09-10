@@ -55,10 +55,22 @@ export const useConversations = () => {
     loadConversations();
   }, []);
 
+  const refreshConversations = useCallback(async () => {
+    try {
+      const data = await getConversations();
+      setConversations(data);
+      return data;
+    } catch (err: any) {
+      console.error("Refresh conversations failed:", err);
+      // Don't show error message for refresh, just log it
+    }
+  }, []);
+
   return {
     loading,
     conversations,
     loadConversations,
+    refreshConversations,
     handleCreateConversation,
   };
 };

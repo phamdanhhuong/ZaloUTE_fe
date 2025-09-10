@@ -11,7 +11,7 @@ const REACTION_TYPES = [
   { type: "angry", icon: "😡" },
 ];
 
-import { Input, Button, Avatar, Empty, Spin, Typography, Popover, Tabs } from "antd";
+import { Input, Button, Avatar, Empty, Spin, Typography, Popover, Tabs, Space, Dropdown } from "antd";
 import {
   SearchOutlined,
   TeamOutlined,
@@ -21,6 +21,9 @@ import {
   SendOutlined,
   CheckCircleOutlined,
   UserOutlined,
+  SettingOutlined,
+  MoreOutlined,
+  CrownOutlined,
 } from "@ant-design/icons";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useSocket } from "../hooks/useSocket";
@@ -31,15 +34,21 @@ import {
   SocketMessage,
   SocketConversation,
 } from "@/infrastructure/socket/socketService";
+import { GroupSettingsModal } from "./GroupSettingsModal";
+import type { Conversation } from "../service";
 import styles from "./ChatAreaNew.module.css";
 
 const { Text, Title } = Typography;
 
 interface ChatAreaProps {
   conversation?: SocketConversation;
+  onConversationUpdate?: (conversation: Conversation) => void;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ 
+  conversation,
+  onConversationUpdate 
+}) => {
   console.log("ChatAreaNew received conversation:", conversation);
 
   const dispatch = useDispatch();
@@ -65,6 +74,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const [sending, setSending] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showReactionPopup, setShowReactionPopup] = useState<string | null>(null);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -162,7 +172,58 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     return "Cuộc trò chuyện";
   };
 
+  const isGroupAdmin = conversation?.type === 'group' && conversation.groupAdmin === currentUser?.id;
+  const isGroupMember = conversation?.type === 'group' && conversation.participants?.includes(currentUser?.id || '');
+
+  const getGroupActions = () => {
+    if (conversation?.type !== 'group' || !isGroupMember) return null;
+
+    return {
+      items: [
+        {
+          key: 'settings',
+          icon: <SettingOutlined />,
+          label: 'Cài đặt nhóm',
+          onClick: () => setShowGroupSettings(true),
+        },
+      ],
+    };
+  };
+
   const getConversationAvatar = () => {
+    if (!conversation) return null;
+
+    // Nếu là group chat, hiển thị avatar group
+    if (conversation.type === 'group') {
+      return (
+        <div style={{ position: 'relative' }}>
+          <Avatar 
+            size={40} 
+            className={styles.avatar}
+            src={conversation.avatar}
+            style={{ backgroundColor: '#1890ff' }}
+          >
+            {!conversation.avatar && <TeamOutlined />}
+          </Avatar>
+          {conversation.groupAdmin === currentUser?.id && (
+            <CrownOutlined 
+              style={{ 
+                position: 'absolute', 
+                top: -2, 
+                right: -2, 
+                color: '#faad14',
+                fontSize: 10,
+                background: 'white',
+                borderRadius: '50%',
+                padding: 1
+              }} 
+            />
+          )}
+        </div>
+      );
+    }
+
+    // Nếu là chat 1-1, hiển thị avatar fallback
     const name = getConversationName();
     return (
       <Avatar size={40} className={styles.avatar}>

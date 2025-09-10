@@ -6,6 +6,7 @@ import {
   setLoading, 
   setError,
   setConversations,
+  removeConversation,
   addMessage,
   setMessages,
   addTypingUser,
@@ -88,6 +89,15 @@ export const useSocket = () => {
       unsubscribers.push(socketService.onMessageReactionUpdated((data) => {
         console.log('Received MESSAGE_REACTION_UPDATED:', data);
         dispatch(updateMessageReactions(data));
+      }));
+
+      // Group events
+      unsubscribers.push(socketService.onGroupDissolved((data) => {
+        console.log('Group dissolved:', data);
+        // Remove the dissolved group from conversations
+        dispatch(removeConversation({ conversationId: data.conversationId }));
+        // Show notification
+        console.log(`Group dissolved: ${data.message}`);
       }));
 
       unsubscribeRefs.current = unsubscribers;

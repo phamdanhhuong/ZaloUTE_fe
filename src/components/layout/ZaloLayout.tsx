@@ -23,10 +23,12 @@ import { ConversationList, ChatArea } from "@/features/chat";
 import { createConversation } from "@/features/chat/service";
 import { ChatArea as ChatAreaNew } from "@/features/chat/components/ChatAreaNew";
 import { useSocket } from "@/features/chat/hooks/useSocket";
+import { useConversations } from "@/features/chat/hooks/useChat";
 import {
   Friend,
   UserSearch,
   ListFriend,
+  ListGroup,
   useFriends,
   FriendRequests,
   useFriendRequests,
@@ -56,6 +58,7 @@ export const ZaloLayout: React.FC = () => {
   const token = useAppSelector((state) => state.user.token);
   const { loading, friends } = useFriends();
   const { requests: friendRequests, loadPendingRequests } = useFriendRequests();
+  const { conversations, loading: conversationsLoading } = useConversations();
   
   // Socket integration
   const { isConnected, connect, disconnect, joinConversation } = useSocket();
@@ -180,6 +183,31 @@ export const ZaloLayout: React.FC = () => {
     setShowUserProfile(false); // Hide profile when changing tabs
   };
 
+  // Convert conversations to groups format for ListGroup
+  const groups = conversations
+    .filter(conv => conv.type === 'group' || conv.isGroup)
+    .map(conv => {
+      console.log('Conversation for group:', conv); // Debug log
+      return {
+        id: conv._id || conv.id || '',
+        name: conv.name || conv.groupName || `Nhóm ${conv.participants?.length || 0} thành viên`,
+        avatar: (conv as any).avatar, // Type assertion for avatar property
+        memberCount: conv.participants?.length || 0,
+        isAdmin: (conv as any).groupAdmin?._id === currentUser?.id,
+      };
+    });
+
+  const handleOpenGroup = (group: any) => {
+    const conversation = conversations.find(conv => 
+      (conv._id || conv.id) === group.id
+    );
+    if (conversation) {
+      handleConversationSelect(conversation);
+      setActiveView("chat"); // Chuyển về view chat
+    }
+  };
+
+
   const handleLogout = () => {
     // Dispatch logout action to clear user data from store
     dispatch(logout());
@@ -234,10 +262,11 @@ export const ZaloLayout: React.FC = () => {
         );
       case "groups":
         return (
-          <div style={{ padding: 20, textAlign: "center" }}>
-            <h3>Danh sách nhóm và cộng đồng</h3>
-            <p>Tính năng này sẽ được phát triển trong tương lai</p>
-          </div>
+          <ListGroup
+            groups={groups}
+            loading={conversationsLoading}
+            onOpenGroup={handleOpenGroup}
+          />
         );
       case "friend-requests":
         return (

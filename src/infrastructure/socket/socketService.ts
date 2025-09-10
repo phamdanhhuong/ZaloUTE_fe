@@ -26,6 +26,7 @@ export interface SocketConversation {
   type: "private" | "group";
   name?: string;
   avatar?: string;
+  groupAdmin?: string; // Group admin ID
   createdAt: string;
   updatedAt: string;
 }
@@ -46,12 +47,48 @@ export interface GetMessagesData {
 export interface TypingData {
   conversationId: string;
 }
+
 export interface SendReactionData {
   messageId: string;
   userId: string;
   type: string;
   conversationId: string;
   value: string;
+}
+
+// Group management socket data interfaces
+export interface CreateGroupData {
+  name: string;
+  participantIds: string[];
+  avatar?: string;
+}
+
+export interface UpdateGroupNameData {
+  conversationId: string;
+  name: string;
+}
+
+export interface AddGroupMemberData {
+  conversationId: string;
+  userIds: string[];
+}
+
+export interface RemoveGroupMemberData {
+  conversationId: string;
+  userId: string;
+}
+
+export interface LeaveGroupData {
+  conversationId: string;
+}
+
+export interface TransferGroupAdminData {
+  conversationId: string;
+  newAdminId: string;
+}
+
+export interface DissolveGroupData {
+  conversationId: string;
 }
 
 export const SOCKET_EVENTS = {
@@ -66,6 +103,23 @@ export const SOCKET_EVENTS = {
   GET_CONVERSATIONS_RESULT: "get_conversations_result",
   JOIN_CONVERSATION: "join_conversation",
   LEAVE_CONVERSATION: "leave_conversation",
+
+  // Group management events
+  CREATE_GROUP: "create_group",
+  GROUP_CREATED: "group_created",
+  UPDATE_GROUP_NAME: "update_group_name",
+  GROUP_NAME_UPDATED: "group_name_updated",
+  ADD_GROUP_MEMBERS: "add_group_members",
+  GROUP_MEMBER_ADDED: "group_member_added",
+  REMOVE_GROUP_MEMBER: "remove_group_member",
+  GROUP_MEMBER_REMOVED: "group_member_removed",
+  LEAVE_GROUP: "leave_group",
+  GROUP_MEMBER_LEFT: "group_member_left",
+  TRANSFER_GROUP_ADMIN: "transfer_group_admin",
+  GROUP_ADMIN_TRANSFERRED: "group_admin_transferred",
+  GROUP_AVATAR_UPDATED: "group_avatar_updated",
+  DISSOLVE_GROUP: "dissolve_group",
+  GROUP_DISSOLVED: "group_dissolved",
 
   // User status events
   USER_ONLINE: "user_online",
@@ -83,7 +137,7 @@ export const SOCKET_EVENTS = {
 } as const;
 
 class SocketService {
-  private socket: Socket | null = null;
+  private socket: ReturnType<typeof io> | null = null;
   private token: string | null = null;
 
   // Initialize socket connection
@@ -242,13 +296,19 @@ class SocketService {
 
   // Event listeners
   onReceiveMessage(callback: (message: SocketMessage) => void): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onReceiveMessage listener");
+      return () => {}; // Return empty cleanup function
+    }
     this.socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, callback);
     return () => this.socket?.off(SOCKET_EVENTS.RECEIVE_MESSAGE, callback);
   }
 
   onMessagesResult(callback: (messages: SocketMessage[]) => void): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onMessagesResult listener");
+      return () => {};
+    }
     this.socket.on(SOCKET_EVENTS.GET_MESSAGES_RESULT, callback);
     return () => this.socket?.off(SOCKET_EVENTS.GET_MESSAGES_RESULT, callback);
   }
@@ -256,20 +316,29 @@ class SocketService {
   onConversationsResult(
     callback: (conversations: SocketConversation[]) => void
   ): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onConversationsResult listener");
+      return () => {};
+    }
     this.socket.on(SOCKET_EVENTS.GET_CONVERSATIONS_RESULT, callback);
     return () =>
       this.socket?.off(SOCKET_EVENTS.GET_CONVERSATIONS_RESULT, callback);
   }
 
   onUserOnline(callback: (data: { userId: string }) => void): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onUserOnline listener");
+      return () => {};
+    }
     this.socket.on(SOCKET_EVENTS.USER_ONLINE, callback);
     return () => this.socket?.off(SOCKET_EVENTS.USER_ONLINE, callback);
   }
 
   onUserOffline(callback: (data: { userId: string }) => void): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onUserOffline listener");
+      return () => {};
+    }
     this.socket.on(SOCKET_EVENTS.USER_OFFLINE, callback);
     return () => this.socket?.off(SOCKET_EVENTS.USER_OFFLINE, callback);
   }
@@ -277,7 +346,10 @@ class SocketService {
   onTypingStart(
     callback: (data: { userId: string; conversationId: string }) => void
   ): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onTypingStart listener");
+      return () => {};
+    }
     this.socket.on(SOCKET_EVENTS.TYPING_START, callback);
     return () => this.socket?.off(SOCKET_EVENTS.TYPING_START, callback);
   }
@@ -285,20 +357,178 @@ class SocketService {
   onTypingStop(
     callback: (data: { userId: string; conversationId: string }) => void
   ): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onTypingStop listener");
+      return () => {};
+    }
     this.socket.on(SOCKET_EVENTS.TYPING_STOP, callback);
     return () => this.socket?.off(SOCKET_EVENTS.TYPING_STOP, callback);
   }
 
   onMessageReactionUpdated(callback: (data: { messageId: string; conversationId: string; reactions: any }) => void): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onMessageReactionUpdated listener");
+      return () => {};
+    }
     this.socket.on(SOCKET_EVENTS.MESSAGE_REACTION_UPDATED, callback);
     return () => this.socket?.off(SOCKET_EVENTS.MESSAGE_REACTION_UPDATED, callback);
   }
+
+  // Group management socket methods
+  async createGroup(data: CreateGroupData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.CREATE_GROUP, data);
+    } catch (error) {
+      console.error("Failed to create group:", error);
+      throw error;
+    }
+  }
+
+  async updateGroupName(data: UpdateGroupNameData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.UPDATE_GROUP_NAME, data);
+    } catch (error) {
+      console.error("Failed to update group name:", error);
+      throw error;
+    }
+  }
+
+  async addGroupMembers(data: AddGroupMemberData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.ADD_GROUP_MEMBERS, data);
+    } catch (error) {
+      console.error("Failed to add group members:", error);
+      throw error;
+    }
+  }
+
+  async removeGroupMember(data: RemoveGroupMemberData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.REMOVE_GROUP_MEMBER, data);
+    } catch (error) {
+      console.error("Failed to remove group member:", error);
+      throw error;
+    }
+  }
+
+  async leaveGroup(data: LeaveGroupData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.LEAVE_GROUP, data);
+    } catch (error) {
+      console.error("Failed to leave group:", error);
+      throw error;
+    }
+  }
+
+  async transferGroupAdmin(data: TransferGroupAdminData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.TRANSFER_GROUP_ADMIN, data);
+    } catch (error) {
+      console.error("Failed to transfer group admin:", error);
+      throw error;
+    }
+  }
+
+  // Group event listeners
+  onGroupCreated(callback: (data: { conversation: SocketConversation; createdBy: string }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onGroupCreated listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.GROUP_CREATED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.GROUP_CREATED, callback);
+  }
+
+  onGroupNameUpdated(callback: (data: { conversationId: string; newName: string; updatedBy: string; conversation: SocketConversation }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onGroupNameUpdated listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.GROUP_NAME_UPDATED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.GROUP_NAME_UPDATED, callback);
+  }
+
+  onGroupMemberAdded(callback: (data: { conversationId: string; newMemberIds: string[]; addedBy: string; conversation: SocketConversation }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onGroupMemberAdded listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.GROUP_MEMBER_ADDED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.GROUP_MEMBER_ADDED, callback);
+  }
+
+  onGroupMemberRemoved(callback: (data: { conversationId: string; removedUserId: string; removedBy: string; conversation: SocketConversation }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onGroupMemberRemoved listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.GROUP_MEMBER_REMOVED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.GROUP_MEMBER_REMOVED, callback);
+  }
+
+  onGroupMemberLeft(callback: (data: { conversationId: string; leftUserId: string; conversation?: SocketConversation }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onGroupMemberLeft listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.GROUP_MEMBER_LEFT, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.GROUP_MEMBER_LEFT, callback);
+  }
+
+  onGroupAdminTransferred(callback: (data: { conversationId: string; oldAdminId: string; newAdminId: string; conversation: SocketConversation }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onGroupAdminTransferred listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.GROUP_ADMIN_TRANSFERRED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.GROUP_ADMIN_TRANSFERRED, callback);
+  }
+
+  onGroupAvatarUpdated(callback: (data: { conversationId: string; avatar: string; updatedBy: string; conversation: SocketConversation }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onGroupAvatarUpdated listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.GROUP_AVATAR_UPDATED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.GROUP_AVATAR_UPDATED, callback);
+  }
+
   onError(callback: (error: any) => void): () => void {
-    if (!this.socket) throw new Error("Socket not connected");
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onError listener");
+      return () => {};
+    }
     this.socket.on(SOCKET_EVENTS.ERROR, callback);
     return () => this.socket?.off(SOCKET_EVENTS.ERROR, callback);
+  }
+
+  // Dissolve group
+  async dissolveGroup(data: DissolveGroupData): Promise<void> {
+    try {
+      if (!this.socket) {
+        console.warn("Socket not connected, cannot dissolve group");
+        return;
+      }
+      this.socket.emit(SOCKET_EVENTS.DISSOLVE_GROUP, data);
+    } catch (error) {
+      console.error("Failed to dissolve group:", error);
+      throw error;
+    }
+  }
+
+  onGroupDissolved(callback: (data: { conversationId: string; adminId: string; message: string }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onGroupDissolved listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.GROUP_DISSOLVED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.GROUP_DISSOLVED, callback);
   }
 }
 
