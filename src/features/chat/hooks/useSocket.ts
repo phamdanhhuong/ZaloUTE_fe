@@ -46,10 +46,12 @@ export const useSocket = () => {
 
       // Message events
       unsubscribers.push(socketService.onReceiveMessage((message: SocketMessage) => {
+        console.log("Received message via socket:", message);
         dispatch(addMessage(message));
       }));
 
       unsubscribers.push(socketService.onMessagesResult((messages: SocketMessage[]) => {
+        console.log("Received messages result:", messages.length, "messages");
         if (activeConversationId) {
           dispatch(setMessages({ conversationId: activeConversationId, messages }));
         }
@@ -71,10 +73,12 @@ export const useSocket = () => {
 
       // Typing events
       unsubscribers.push(socketService.onTypingStart((data) => {
+        console.log("Received typing start:", data);
         dispatch(addTypingUser({ userId: data.userId, conversationId: data.conversationId }));
       }));
 
       unsubscribers.push(socketService.onTypingStop((data) => {
+        console.log("Received typing stop:", data);
         dispatch(removeTypingUser({ userId: data.userId, conversationId: data.conversationId }));
       }));
 
@@ -128,7 +132,9 @@ export const useSocket = () => {
   // Send message
   const sendMessage = useCallback(async (data: SendMessageData) => {
     try {
+      console.log("Attempting to send message:", data);
       await socketService.sendMessage(data);
+      console.log("Message sent via socket");
     } catch (error) {
       console.error('Failed to send message:', error);
       dispatch(setError('Failed to send message'));
@@ -168,9 +174,13 @@ export const useSocket = () => {
 
   // Start typing
   const startTyping = useCallback((conversationId: string) => {
-    if (!isConnected) return;
+    if (!isConnected) {
+      console.log("Cannot start typing: not connected");
+      return;
+    }
 
     try {
+      console.log("Starting typing for conversation:", conversationId);
       socketService.startTyping(conversationId);
     } catch (error) {
       console.error('Failed to start typing:', error);
@@ -179,9 +189,13 @@ export const useSocket = () => {
 
   // Stop typing
   const stopTyping = useCallback((conversationId: string) => {
-    if (!isConnected) return;
+    if (!isConnected) {
+      console.log("Cannot stop typing: not connected");
+      return;
+    }
 
     try {
+      console.log("Stopping typing for conversation:", conversationId);
       socketService.stopTyping(conversationId);
     } catch (error) {
       console.error('Failed to stop typing:', error);

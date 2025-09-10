@@ -6,6 +6,7 @@ interface UserState {
   token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
+  isInitialized: boolean;
 }
 
 const initialState: UserState = {
@@ -13,6 +14,7 @@ const initialState: UserState = {
   token: null,
   isAuthenticated: false,
   loading: false,
+  isInitialized: false,
 };
 
 const userSlice = createSlice({
@@ -66,6 +68,7 @@ const userSlice = createSlice({
           }
         }
       }
+      state.isInitialized = true;
     },
   },
 });

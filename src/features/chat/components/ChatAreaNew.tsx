@@ -78,17 +78,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get messages for active conversation
-  const conversationMessages = activeConversationId
-    ? [...(messages[activeConversationId] || [])].reverse()
-    : [];
+  // Get messages for active conversation and ensure correct order
+  const conversationMessages = React.useMemo(() => {
+    if (!activeConversationId || !messages[activeConversationId]) {
+      return [];
+    }
+    
+    return [...messages[activeConversationId]].sort((a, b) => {
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      return dateA.getTime() - dateB.getTime();
+    });
+  }, [activeConversationId, messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Scroll to bottom when messages change, with a small delay to ensure DOM update
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
   }, [conversationMessages]);
 
   // Set active conversation and load messages
@@ -106,6 +117,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           );
           await joinConversation(conversation._id);
           await getMessages({ conversationId: conversation._id, limit: 50 });
+          
+          // Force scroll to bottom after loading messages
+          setTimeout(() => {
+            scrollToBottom();
+          }, 300);
         } catch (error) {
           console.error("Failed to initialize conversation:", error);
         }
@@ -141,6 +157,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             conversationId: activeConversationId,
             limit: 50,
           });
+          
+          // Force scroll to bottom after reconnecting
+          setTimeout(() => {
+            scrollToBottom();
+          }, 300);
         } catch (error) {
           console.error("Failed to reconnect conversation:", error);
         }
@@ -237,13 +258,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleSendMessage = async (content: string, type: "text" | "emoji" | "sticker" = "text") => {
     if (!content.trim() || sending || !conversation) return;
 
+    console.log("Sending message:", content, "to conversation:", conversation._id, "isConnected:", isConnected);
+    
     setSending(true);
     try {
-      sendMessage({
+      await sendMessage({
         conversationId: conversation._id,
         content: content.trim(),
         type,
       });
+      console.log("Message sent successfully");
       setMessageInput("");
 
       // Stop typing when message is sent
@@ -296,8 +320,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     if (!conversation) return;
 
+    console.log("Input change, isConnected:", isConnected, "conversation:", conversation._id);
+
     // Handle typing indicators
     if (value.trim()) {
+      console.log("Starting typing for conversation:", conversation._id);
       startTyping(conversation._id);
 
       // Clear existing timeout
@@ -307,12 +334,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       // Set new timeout to stop typing after 3 seconds of inactivity
       typingTimeoutRef.current = setTimeout(() => {
+        console.log("Stopping typing for conversation:", conversation._id);
         stopTyping(conversation._id);
       }, 3000);
     } else {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
+      console.log("Stopping typing (empty input) for conversation:", conversation._id);
       stopTyping(conversation._id);
     }
   };

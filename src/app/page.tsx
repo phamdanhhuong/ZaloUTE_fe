@@ -10,15 +10,26 @@ export default function Home() {
   const isLoggedIn = useSelector(
     (state: RootState) => state.user.isAuthenticated
   );
+  const isInitialized = useSelector(
+    (state: RootState) => state.user.isInitialized
+  );
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    // Only redirect after initialization is complete
+    if (isInitialized && !isLoggedIn) {
       router.push("/login");
     }
-  }, [isLoggedIn, router]);
+  }, [isLoggedIn, isInitialized, router]);
 
+  // Show loading while initializing
+  if (!isInitialized) {
+    return <div>Đang tải...</div>;
+  }
+
+  // Show loading while redirecting
   if (!isLoggedIn) {
     return <div>Đang chuyển hướng...</div>;
   }
+
   return <ZaloLayout />;
 }
