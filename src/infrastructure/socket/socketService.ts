@@ -11,12 +11,12 @@ export interface SocketMessage {
     avatarUrl: string;
   };
   content: string;
-  type: "text" | "image" | "file" | "emoji" | "sticker";
+  type: "text" | "image" | "video" | "file" | "emoji" | "sticker";
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
   reactions?: {
-    [type: string]: { count: number; userIds: string[] }
+    [type: string]: { count: number; userIds: string[] };
   };
 }
 
@@ -35,7 +35,7 @@ export interface SendMessageData {
   conversationId?: string;
   receiverId?: string;
   content: string;
-  type?: "text" | "image" | "file" | "emoji" | "sticker";
+  type?: "text" | "image" | "video" | "file" | "emoji" | "sticker";
 }
 
 export interface GetMessagesData {
@@ -160,17 +160,14 @@ class SocketService {
         resolve();
       });
 
-
       this.socket.on("connect_error", (error: any) => {
         console.error("Socket connection error:", error);
         reject(error);
       });
 
-
       this.socket.on(SOCKET_EVENTS.CONNECTION_SUCCESS, (data: any) => {
         console.log("Connection successful:", data);
       });
-
 
       this.socket.on(SOCKET_EVENTS.ERROR, (error: any) => {
         console.error("Socket error:", error);
@@ -275,9 +272,9 @@ class SocketService {
     try {
       await this.waitForConnection();
       this.socket!.emit(SOCKET_EVENTS.ADD_REACTION, data);
-      console.log('[DEBUG] Sent ADD_REACTION:', data);
+      console.log("[DEBUG] Sent ADD_REACTION:", data);
     } catch (error) {
-      console.error('Failed to send reaction:', error);
+      console.error("Failed to send reaction:", error);
       throw error;
     }
   }
@@ -297,7 +294,9 @@ class SocketService {
   // Event listeners
   onReceiveMessage(callback: (message: SocketMessage) => void): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onReceiveMessage listener");
+      console.warn(
+        "Socket not connected, cannot register onReceiveMessage listener"
+      );
       return () => {}; // Return empty cleanup function
     }
     this.socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, callback);
@@ -306,7 +305,9 @@ class SocketService {
 
   onMessagesResult(callback: (messages: SocketMessage[]) => void): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onMessagesResult listener");
+      console.warn(
+        "Socket not connected, cannot register onMessagesResult listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GET_MESSAGES_RESULT, callback);
@@ -317,7 +318,9 @@ class SocketService {
     callback: (conversations: SocketConversation[]) => void
   ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onConversationsResult listener");
+      console.warn(
+        "Socket not connected, cannot register onConversationsResult listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GET_CONVERSATIONS_RESULT, callback);
@@ -327,7 +330,9 @@ class SocketService {
 
   onUserOnline(callback: (data: { userId: string }) => void): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onUserOnline listener");
+      console.warn(
+        "Socket not connected, cannot register onUserOnline listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.USER_ONLINE, callback);
@@ -336,7 +341,9 @@ class SocketService {
 
   onUserOffline(callback: (data: { userId: string }) => void): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onUserOffline listener");
+      console.warn(
+        "Socket not connected, cannot register onUserOffline listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.USER_OFFLINE, callback);
@@ -347,7 +354,9 @@ class SocketService {
     callback: (data: { userId: string; conversationId: string }) => void
   ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onTypingStart listener");
+      console.warn(
+        "Socket not connected, cannot register onTypingStart listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.TYPING_START, callback);
@@ -358,20 +367,31 @@ class SocketService {
     callback: (data: { userId: string; conversationId: string }) => void
   ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onTypingStop listener");
+      console.warn(
+        "Socket not connected, cannot register onTypingStop listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.TYPING_STOP, callback);
     return () => this.socket?.off(SOCKET_EVENTS.TYPING_STOP, callback);
   }
 
-  onMessageReactionUpdated(callback: (data: { messageId: string; conversationId: string; reactions: any }) => void): () => void {
+  onMessageReactionUpdated(
+    callback: (data: {
+      messageId: string;
+      conversationId: string;
+      reactions: any;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onMessageReactionUpdated listener");
+      console.warn(
+        "Socket not connected, cannot register onMessageReactionUpdated listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.MESSAGE_REACTION_UPDATED, callback);
-    return () => this.socket?.off(SOCKET_EVENTS.MESSAGE_REACTION_UPDATED, callback);
+    return () =>
+      this.socket?.off(SOCKET_EVENTS.MESSAGE_REACTION_UPDATED, callback);
   }
 
   // Group management socket methods
@@ -436,63 +456,124 @@ class SocketService {
   }
 
   // Group event listeners
-  onGroupCreated(callback: (data: { conversation: SocketConversation; createdBy: string }) => void): () => void {
+  onGroupCreated(
+    callback: (data: {
+      conversation: SocketConversation;
+      createdBy: string;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onGroupCreated listener");
+      console.warn(
+        "Socket not connected, cannot register onGroupCreated listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GROUP_CREATED, callback);
     return () => this.socket?.off(SOCKET_EVENTS.GROUP_CREATED, callback);
   }
 
-  onGroupNameUpdated(callback: (data: { conversationId: string; newName: string; updatedBy: string; conversation: SocketConversation }) => void): () => void {
+  onGroupNameUpdated(
+    callback: (data: {
+      conversationId: string;
+      newName: string;
+      updatedBy: string;
+      conversation: SocketConversation;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onGroupNameUpdated listener");
+      console.warn(
+        "Socket not connected, cannot register onGroupNameUpdated listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GROUP_NAME_UPDATED, callback);
     return () => this.socket?.off(SOCKET_EVENTS.GROUP_NAME_UPDATED, callback);
   }
 
-  onGroupMemberAdded(callback: (data: { conversationId: string; newMemberIds: string[]; addedBy: string; conversation: SocketConversation }) => void): () => void {
+  onGroupMemberAdded(
+    callback: (data: {
+      conversationId: string;
+      newMemberIds: string[];
+      addedBy: string;
+      conversation: SocketConversation;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onGroupMemberAdded listener");
+      console.warn(
+        "Socket not connected, cannot register onGroupMemberAdded listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GROUP_MEMBER_ADDED, callback);
     return () => this.socket?.off(SOCKET_EVENTS.GROUP_MEMBER_ADDED, callback);
   }
 
-  onGroupMemberRemoved(callback: (data: { conversationId: string; removedUserId: string; removedBy: string; conversation: SocketConversation }) => void): () => void {
+  onGroupMemberRemoved(
+    callback: (data: {
+      conversationId: string;
+      removedUserId: string;
+      removedBy: string;
+      conversation: SocketConversation;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onGroupMemberRemoved listener");
+      console.warn(
+        "Socket not connected, cannot register onGroupMemberRemoved listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GROUP_MEMBER_REMOVED, callback);
     return () => this.socket?.off(SOCKET_EVENTS.GROUP_MEMBER_REMOVED, callback);
   }
 
-  onGroupMemberLeft(callback: (data: { conversationId: string; leftUserId: string; conversation?: SocketConversation }) => void): () => void {
+  onGroupMemberLeft(
+    callback: (data: {
+      conversationId: string;
+      leftUserId: string;
+      conversation?: SocketConversation;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onGroupMemberLeft listener");
+      console.warn(
+        "Socket not connected, cannot register onGroupMemberLeft listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GROUP_MEMBER_LEFT, callback);
     return () => this.socket?.off(SOCKET_EVENTS.GROUP_MEMBER_LEFT, callback);
   }
 
-  onGroupAdminTransferred(callback: (data: { conversationId: string; oldAdminId: string; newAdminId: string; conversation: SocketConversation }) => void): () => void {
+  onGroupAdminTransferred(
+    callback: (data: {
+      conversationId: string;
+      oldAdminId: string;
+      newAdminId: string;
+      conversation: SocketConversation;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onGroupAdminTransferred listener");
+      console.warn(
+        "Socket not connected, cannot register onGroupAdminTransferred listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GROUP_ADMIN_TRANSFERRED, callback);
-    return () => this.socket?.off(SOCKET_EVENTS.GROUP_ADMIN_TRANSFERRED, callback);
+    return () =>
+      this.socket?.off(SOCKET_EVENTS.GROUP_ADMIN_TRANSFERRED, callback);
   }
 
-  onGroupAvatarUpdated(callback: (data: { conversationId: string; avatar: string; updatedBy: string; conversation: SocketConversation }) => void): () => void {
+  onGroupAvatarUpdated(
+    callback: (data: {
+      conversationId: string;
+      avatar: string;
+      updatedBy: string;
+      conversation: SocketConversation;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onGroupAvatarUpdated listener");
+      console.warn(
+        "Socket not connected, cannot register onGroupAvatarUpdated listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GROUP_AVATAR_UPDATED, callback);
@@ -522,9 +603,17 @@ class SocketService {
     }
   }
 
-  onGroupDissolved(callback: (data: { conversationId: string; adminId: string; message: string }) => void): () => void {
+  onGroupDissolved(
+    callback: (data: {
+      conversationId: string;
+      adminId: string;
+      message: string;
+    }) => void
+  ): () => void {
     if (!this.socket) {
-      console.warn("Socket not connected, cannot register onGroupDissolved listener");
+      console.warn(
+        "Socket not connected, cannot register onGroupDissolved listener"
+      );
       return () => {};
     }
     this.socket.on(SOCKET_EVENTS.GROUP_DISSOLVED, callback);

@@ -246,7 +246,9 @@
 }
 
 @keyframes typing {
-  0%, 60%, 100% {
+  0%,
+  60%,
+  100% {
     transform: scale(1);
     opacity: 0.5;
   }
@@ -330,20 +332,110 @@
   border: 1px solid #ffccc7;
 }
 
+/* File Preview Styles */
+.filePreviewContainer {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.filePreviewItem {
+  position: relative;
+  display: inline-block;
+}
+
+.imagePreview {
+  position: relative;
+  display: inline-block;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #d9d9d9;
+  background: white;
+}
+
+.videoPreview,
+.filePreview {
+  position: relative;
+  display: inline-block;
+}
+
+.removeFileBtn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.removeFileBtn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* Message Attachment Styles */
+.messageImage img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  transition: transform 0.2s;
+}
+
+.messageImage img:hover {
+  transform: scale(1.02);
+}
+
+.messageVideo video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.messageFile a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #1890ff;
+  transition: background-color 0.2s;
+  min-width: 200px;
+}
+
+.messageFile a:hover {
+  background: #e6f7ff;
+  color: #096dd9;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .chatHeader {
     padding: 12px 16px;
   }
-  
+
   .messagesList {
     padding: 12px 16px;
   }
-  
+
   .messageInput {
     padding: 12px 16px;
   }
-  
+
   .messageContent {
     max-width: 85%;
   }

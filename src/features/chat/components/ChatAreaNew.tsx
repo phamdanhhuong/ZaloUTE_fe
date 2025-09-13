@@ -11,7 +11,19 @@ const REACTION_TYPES = [
   { type: "angry", icon: "😡" },
 ];
 
-import { Input, Button, Avatar, Empty, Spin, Typography, Popover, Tabs, Space, Dropdown } from "antd";
+import {
+  Input,
+  Button,
+  Avatar,
+  Empty,
+  Spin,
+  Typography,
+  Popover,
+  Tabs,
+  Space,
+  Dropdown,
+  Progress,
+} from "antd";
 import {
   SearchOutlined,
   TeamOutlined,
@@ -36,6 +48,7 @@ import {
 } from "@/infrastructure/socket/socketService";
 import { GroupSettingsModal } from "./GroupSettingsModal";
 import type { Conversation } from "../service";
+import uploadService from "@/infrastructure/http/uploadService";
 import styles from "./ChatAreaNew.module.css";
 
 const { Text, Title } = Typography;
@@ -45,9 +58,9 @@ interface ChatAreaProps {
   onConversationUpdate?: (conversation: Conversation) => void;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ 
+export const ChatArea: React.FC<ChatAreaProps> = ({
   conversation,
-  onConversationUpdate 
+  onConversationUpdate,
 }) => {
   console.log("ChatAreaNew received conversation:", conversation);
 
@@ -73,17 +86,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [messageInput, setMessageInput] = useState("");
   const [sending, setSending] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showReactionPopup, setShowReactionPopup] = useState<string | null>(null);
+  const [showReactionPopup, setShowReactionPopup] = useState<string | null>(
+    null
+  );
   const [showGroupSettings, setShowGroupSettings] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewFiles, setPreviewFiles] = useState<
+    {
+      file: File;
+      type: "image" | "video" | "file";
+      preview?: string;
+      uploadProgress?: number;
+    }[]
+  >([]);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get messages for active conversation and ensure correct order
   const conversationMessages = React.useMemo(() => {
     if (!activeConversationId || !messages[activeConversationId]) {
       return [];
     }
-    
+
     return [...messages[activeConversationId]].sort((a, b) => {
       const dateA = new Date(a.createdAt);
       const dateB = new Date(b.createdAt);
@@ -117,7 +143,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           );
           await joinConversation(conversation._id);
           await getMessages({ conversationId: conversation._id, limit: 50 });
-          
+
           // Force scroll to bottom after loading messages
           setTimeout(() => {
             scrollToBottom();
@@ -157,7 +183,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             conversationId: activeConversationId,
             limit: 50,
           });
-          
+
           // Force scroll to bottom after reconnecting
           setTimeout(() => {
             scrollToBottom();
@@ -177,6 +203,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     getMessages,
   ]);
 
+  // Cleanup object URLs on component unmount
+  useEffect(() => {
+    return () => {
+      previewFiles.forEach((fileData) => {
+        if (fileData.preview) {
+          URL.revokeObjectURL(fileData.preview);
+        }
+      });
+    };
+  }, []);
+
   const getConversationName = () => {
     if (!conversation) return "";
 
@@ -193,18 +230,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     return "Cuộc trò chuyện";
   };
 
-  const isGroupAdmin = conversation?.type === 'group' && conversation.groupAdmin === currentUser?.id;
-  const isGroupMember = conversation?.type === 'group' && conversation.participants?.includes(currentUser?.id || '');
+  const isGroupAdmin =
+    conversation?.type === "group" &&
+    conversation.groupAdmin === currentUser?.id;
+  const isGroupMember =
+    conversation?.type === "group" &&
+    conversation.participants?.includes(currentUser?.id || "");
 
   const getGroupActions = () => {
-    if (conversation?.type !== 'group' || !isGroupMember) return null;
+    if (conversation?.type !== "group" || !isGroupMember) return null;
 
     return {
       items: [
         {
-          key: 'settings',
+          key: "settings",
           icon: <SettingOutlined />,
-          label: 'Cài đặt nhóm',
+          label: "Cài đặt nhóm",
           onClick: () => setShowGroupSettings(true),
         },
       ],
@@ -215,29 +256,29 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (!conversation) return null;
 
     // Nếu là group chat, hiển thị avatar group
-    if (conversation.type === 'group') {
+    if (conversation.type === "group") {
       return (
-        <div style={{ position: 'relative' }}>
-          <Avatar 
-            size={40} 
+        <div style={{ position: "relative" }}>
+          <Avatar
+            size={40}
             className={styles.avatar}
             src={conversation.avatar}
-            style={{ backgroundColor: '#1890ff' }}
+            style={{ backgroundColor: "#1890ff" }}
           >
             {!conversation.avatar && <TeamOutlined />}
           </Avatar>
           {conversation.groupAdmin === currentUser?.id && (
-            <CrownOutlined 
-              style={{ 
-                position: 'absolute', 
-                top: -2, 
-                right: -2, 
-                color: '#faad14',
+            <CrownOutlined
+              style={{
+                position: "absolute",
+                top: -2,
+                right: -2,
+                color: "#faad14",
                 fontSize: 10,
-                background: 'white',
-                borderRadius: '50%',
-                padding: 1
-              }} 
+                background: "white",
+                borderRadius: "50%",
+                padding: 1,
+              }}
             />
           )}
         </div>
@@ -253,22 +294,92 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     );
   };
 
+  // Unified message sending handler for text, emoji, sticker, files
+  const handleSendMessage = async (
+    content: string,
+    type: "text" | "image" | "video" | "emoji" | "sticker" | "file" = "text",
+    file?: File,
+    fileIndex?: number
+  ) => {
+    if ((!content.trim() && !file) || sending || !conversation) return;
 
-  // Unified message sending handler for text, emoji, sticker
-  const handleSendMessage = async (content: string, type: "text" | "emoji" | "sticker" = "text") => {
-    if (!content.trim() || sending || !conversation) return;
+    console.log(
+      "Sending message:",
+      content,
+      "type:",
+      type,
+      "file:",
+      file?.name,
+      "to conversation:",
+      conversation._id,
+      "isConnected:",
+      isConnected
+    );
 
-    console.log("Sending message:", content, "to conversation:", conversation._id, "isConnected:", isConnected);
-    
     setSending(true);
+    setUploading(!!file);
+
     try {
+      let messageContent = content;
+      let fileUrl = "";
+
+      // If sending a file, upload it first
+      if (file) {
+        console.log("Uploading file:", file.name);
+
+        // Update progress for this specific file
+        if (fileIndex !== undefined) {
+          setPreviewFiles((prev) =>
+            prev.map((item, index) =>
+              index === fileIndex ? { ...item, uploadProgress: 0 } : item
+            )
+          );
+        }
+
+        try {
+          const uploadResult = await uploadService.uploadFile(
+            file,
+            type === "image"
+              ? "chat-images"
+              : type === "video"
+              ? "chat-videos"
+              : "chat-files",
+            (progress) => {
+              // Update progress for this specific file
+              if (fileIndex !== undefined) {
+                setPreviewFiles((prev) =>
+                  prev.map((item, index) =>
+                    index === fileIndex
+                      ? { ...item, uploadProgress: progress }
+                      : item
+                  )
+                );
+              }
+            }
+          );
+
+          fileUrl = uploadResult.url;
+          messageContent = uploadResult.url; // Send the uploaded file URL
+          console.log("File uploaded successfully:", fileUrl);
+        } catch (uploadError) {
+          console.error("File upload failed:", uploadError);
+          throw new Error(`Failed to upload file: ${file.name}`);
+        }
+      }
+
       await sendMessage({
         conversationId: conversation._id,
-        content: content.trim(),
+        content: messageContent.trim() || fileUrl || file?.name || "",
         type,
       });
       console.log("Message sent successfully");
-      setMessageInput("");
+
+      // Clear input and files only if not sending multiple files
+      if (!file || fileIndex === undefined) {
+        setMessageInput("");
+        setSelectedFiles([]);
+        setPreviewFiles([]);
+      }
 
       // Stop typing when message is sent
       if (typingTimeoutRef.current) {
@@ -279,12 +390,142 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       console.error("Send message failed:", error);
     } finally {
       setSending(false);
+      setUploading(false);
     }
   };
 
   // Old handleSend now just calls handleSendMessage for text
-  const handleSend = () => {
-    handleSendMessage(messageInput, "text");
+  const handleSend = async () => {
+    if (previewFiles.length > 0) {
+      // Send files sequentially to avoid overwhelming the server
+      for (let i = 0; i < previewFiles.length; i++) {
+        const { file, type } = previewFiles[i];
+        try {
+          await handleSendMessage("", type, file, i);
+        } catch (error) {
+          console.error(`Failed to send file ${file.name}:`, error);
+          // Continue with other files even if one fails
+        }
+      }
+      // Clear all files after sending
+      setPreviewFiles([]);
+      setSelectedFiles([]);
+    } else {
+      // Send text message
+      await handleSendMessage(messageInput, "text");
+    }
+  };
+
+  // File handling functions
+  const handleFileSelect = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    fileType: "image" | "video" | "file"
+  ) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    // File validation constants
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB for images
+    const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB for videos
+
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+
+    files.forEach((file) => {
+      // Check file size based on type
+      let maxSize = MAX_FILE_SIZE;
+      if (
+        fileType === "image" ||
+        (fileType === "file" && file.type.startsWith("image/"))
+      ) {
+        maxSize = MAX_IMAGE_SIZE;
+      } else if (
+        fileType === "video" ||
+        (fileType === "file" && file.type.startsWith("video/"))
+      ) {
+        maxSize = MAX_VIDEO_SIZE;
+      }
+
+      if (file.size > maxSize) {
+        const maxSizeMB = maxSize / (1024 * 1024);
+        errors.push(`${file.name} quá lớn (tối đa ${maxSizeMB}MB)`);
+        return;
+      }
+
+      // Check file type for specific categories
+      if (fileType === "image" && !file.type.startsWith("image/")) {
+        errors.push(`${file.name} không phải là file hình ảnh`);
+        return;
+      }
+
+      if (fileType === "video" && !file.type.startsWith("video/")) {
+        errors.push(`${file.name} không phải là file video`);
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    // Show errors if any
+    if (errors.length > 0) {
+      console.error("File validation errors:", errors);
+      // You can show a toast notification here
+      // For now, just log the errors
+    }
+
+    if (validFiles.length === 0) return;
+
+    const newPreviewFiles = validFiles.map((file) => {
+      let type: "image" | "video" | "file" = fileType;
+      let preview: string | undefined;
+
+      // Auto-detect type based on file if not specified
+      if (fileType === "file") {
+        if (file.type.startsWith("image/")) {
+          type = "image";
+        } else if (file.type.startsWith("video/")) {
+          type = "video";
+        }
+      }
+
+      // Create preview for images
+      if (type === "image") {
+        preview = URL.createObjectURL(file);
+      }
+
+      return { file, type, preview };
+    });
+
+    setPreviewFiles((prev) => [...prev, ...newPreviewFiles]);
+    setSelectedFiles((prev) => [...prev, ...validFiles]);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const removePreviewFile = (index: number) => {
+    const fileToRemove = previewFiles[index];
+    if (fileToRemove.preview) {
+      URL.revokeObjectURL(fileToRemove.preview);
+    }
+
+    setPreviewFiles((prev) => prev.filter((_, i) => i !== index));
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const openFileDialog = (
+    accept: string,
+    fileType: "image" | "video" | "file"
+  ) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = accept;
+      fileInputRef.current.onchange = (e) =>
+        handleFileSelect(e as any, fileType);
+      fileInputRef.current.click();
+    }
   };
 
   // Dummy sticker list
@@ -300,7 +541,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const emojis = ["😀", "😂", "😍", "👍", "🎉", "😢", "😡", "❤️"];
   // Chọn emoji thì chèn vào input, chọn sticker thì gửi luôn message type 'sticker'
   // handleSendReaction now only inserts emoji or calls handleSendMessage for sticker
-  const handleSendReaction = (reaction: { type: "emoji" | "sticker"; value: string }) => {
+  const handleSendReaction = (reaction: {
+    type: "emoji" | "sticker";
+    value: string;
+  }) => {
     if (!conversation || !currentUser) return;
     if (reaction.type === "emoji") {
       setMessageInput((prev) => prev + reaction.value);
@@ -320,7 +564,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     if (!conversation) return;
 
-    console.log("Input change, isConnected:", isConnected, "conversation:", conversation._id);
+    console.log(
+      "Input change, isConnected:",
+      isConnected,
+      "conversation:",
+      conversation._id
+    );
 
     // Handle typing indicators
     if (value.trim()) {
@@ -341,7 +590,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      console.log("Stopping typing (empty input) for conversation:", conversation._id);
+      console.log(
+        "Stopping typing (empty input) for conversation:",
+        conversation._id
+      );
       stopTyping(conversation._id);
     }
   };
@@ -465,12 +717,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         ) : (
           <div className={styles.messagesList}>
-
             {conversationMessages.map((message, index) => {
               const isCurrentUser = isCurrentUserMessage(message);
               const showAvatar =
                 index === 0 ||
-                conversationMessages[index - 1].sender?._id !== message.sender?._id;
+                conversationMessages[index - 1].sender?._id !==
+                  message.sender?._id;
 
               // Handler: send reaction
               const handleReact = (reactionType: string) => {
@@ -487,37 +739,115 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
               // Reaction placeholder hover handlers
               const handlePlaceholderEnter = () => {
-                if (reactionPopupTimer.current) clearTimeout(reactionPopupTimer.current);
+                if (reactionPopupTimer.current)
+                  clearTimeout(reactionPopupTimer.current);
                 setShowReactionPopup(message._id);
               };
               const handlePlaceholderLeave = () => {
                 // Auto-hide popup sau 2.5s nếu không hover lại
                 reactionPopupTimer.current = setTimeout(() => {
-                  setShowReactionPopup((cur) => (cur === message._id ? null : cur));
+                  setShowReactionPopup((cur) =>
+                    cur === message._id ? null : cur
+                  );
                 }, 1500);
               };
               const handlePopupEnter = () => {
-                if (reactionPopupTimer.current) clearTimeout(reactionPopupTimer.current);
+                if (reactionPopupTimer.current)
+                  clearTimeout(reactionPopupTimer.current);
                 setShowReactionPopup(message._id);
               };
               const handlePopupLeave = () => {
                 reactionPopupTimer.current = setTimeout(() => {
-                  setShowReactionPopup((cur) => (cur === message._id ? null : cur));
+                  setShowReactionPopup((cur) =>
+                    cur === message._id ? null : cur
+                  );
                 }, 1500);
               };
 
               return (
                 <div
                   key={message._id}
-                  className={`${styles.messageWrapper} ${isCurrentUser ? styles.currentUser : styles.otherUser}`}
+                  className={`${styles.messageWrapper} ${
+                    isCurrentUser ? styles.currentUser : styles.otherUser
+                  }`}
                 >
-                  {!isCurrentUser && showAvatar && getMessageSenderAvatar(message)}
+                  {!isCurrentUser &&
+                    showAvatar &&
+                    getMessageSenderAvatar(message)}
                   <div className={styles.messageContent}>
                     {!isCurrentUser && showAvatar && (
-                      <Text className={styles.senderName}>{getMessageSenderName(message)}</Text>
+                      <Text className={styles.senderName}>
+                        {getMessageSenderName(message)}
+                      </Text>
                     )}
                     <div className={styles.messageBubble}>
-                      <div className={styles.messageText}>{message.content}</div>
+                      {/* Render different content based on message type */}
+                      {message.type === "image" &&
+                      message.content.startsWith("http") ? (
+                        <div className={styles.messageImage}>
+                          <img
+                            src={message.content}
+                            alt="Shared image"
+                            style={{
+                              maxWidth: 300,
+                              maxHeight: 300,
+                              borderRadius: 8,
+                              cursor: "pointer",
+                            }}
+                            onClick={() =>
+                              window.open(message.content, "_blank")
+                            }
+                          />
+                        </div>
+                      ) : message.type === "video" &&
+                        message.content.startsWith("http") ? (
+                        <div className={styles.messageVideo}>
+                          <video
+                            src={message.content}
+                            controls
+                            style={{
+                              maxWidth: 300,
+                              maxHeight: 300,
+                              borderRadius: 8,
+                            }}
+                          />
+                        </div>
+                      ) : message.type === "file" &&
+                        message.content.startsWith("http") ? (
+                        <div className={styles.messageFile}>
+                          <a
+                            href={message.content}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: 8,
+                              background: "#f0f0f0",
+                              borderRadius: 8,
+                              textDecoration: "none",
+                              color: "#1890ff",
+                            }}
+                          >
+                            <span style={{ fontSize: 24 }}>📄</span>
+                            <div>
+                              <div style={{ fontWeight: "bold" }}>
+                                {message.content.split("/").pop() ||
+                                  "Download File"}
+                              </div>
+                              <div style={{ fontSize: 12, color: "#666" }}>
+                                Click to download
+                              </div>
+                            </div>
+                          </a>
+                        </div>
+                      ) : (
+                        <div className={styles.messageText}>
+                          {message.content}
+                        </div>
+                      )}
+
                       <div className={styles.messageTime}>
                         {formatMessageTime(message.createdAt)}
                         {isCurrentUser && message.isRead && (
@@ -525,37 +855,78 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         )}
                       </div>
                       {/* Reaction display + placeholder icon */}
-                      <div style={{ position: 'relative', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div
+                        style={{
+                          position: "relative",
+                          marginTop: 4,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
                         {/* Hiển thị reaction đã thả (nếu có) */}
                         {message.reactions &&
-                          typeof message.reactions === 'object' &&
-                          Object.values(message.reactions).some((r: any) => r && r.count > 0) && (
-                            <div className={styles.reactionSummary} style={{ display: 'flex', gap: 2, alignItems: 'center', background: '#f5f5f5', borderRadius: 16, padding: '0 6px', fontSize: 15, border: '1px solid #eee' }}>
-                              {REACTION_TYPES.filter(rt => message.reactions && message.reactions[rt.type]?.count > 0).map(rt => (
-                                <span key={rt.type} style={{ marginRight: 2 }}>{rt.icon}</span>
+                          typeof message.reactions === "object" &&
+                          Object.values(message.reactions).some(
+                            (r: any) => r && r.count > 0
+                          ) && (
+                            <div
+                              className={styles.reactionSummary}
+                              style={{
+                                display: "flex",
+                                gap: 2,
+                                alignItems: "center",
+                                background: "#f5f5f5",
+                                borderRadius: 16,
+                                padding: "0 6px",
+                                fontSize: 15,
+                                border: "1px solid #eee",
+                              }}
+                            >
+                              {REACTION_TYPES.filter(
+                                (rt) =>
+                                  message.reactions &&
+                                  message.reactions[rt.type]?.count > 0
+                              ).map((rt) => (
+                                <span key={rt.type} style={{ marginRight: 2 }}>
+                                  {rt.icon}
+                                </span>
                               ))}
-                              <span style={{ fontSize: 13, color: '#888', marginLeft: 2 }}>
-                                {Object.values(message.reactions).reduce((sum: number, r: any) => sum + ((r && r.count) || 0), 0)}
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  color: "#888",
+                                  marginLeft: 2,
+                                }}
+                              >
+                                {Object.values(message.reactions).reduce(
+                                  (sum: number, r: any) =>
+                                    sum + ((r && r.count) || 0),
+                                  0
+                                )}
                               </span>
                             </div>
-                        )}
+                          )}
                         {/* Reaction placeholder icon */}
                         <div
                           className={styles.reactionPlaceholder}
                           onMouseEnter={handlePlaceholderEnter}
                           onMouseLeave={handlePlaceholderLeave}
-                          style={{ display: 'inline-block', position: 'relative' }}
+                          style={{
+                            display: "inline-block",
+                            position: "relative",
+                          }}
                         >
                           <span
                             style={{
-                              border: '1px solid #ccc',
-                              borderRadius: '50%',
+                              border: "1px solid #ccc",
+                              borderRadius: "50%",
                               padding: 2,
-                              color: '#bbb',
-                              background: '#fff',
+                              color: "#bbb",
+                              background: "#fff",
                               fontSize: 18,
-                              cursor: 'pointer',
-                              transition: 'border 0.2s',
+                              cursor: "pointer",
+                              transition: "border 0.2s",
                             }}
                           >
                             👍
@@ -565,18 +936,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             <div
                               className={styles.reactionPopup}
                               style={{
-                                position: 'absolute',
+                                position: "absolute",
                                 zIndex: 1000,
-                                background: '#fff',
-                                border: '1px solid #eee',
+                                background: "#fff",
+                                border: "1px solid #eee",
                                 borderRadius: 24,
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                                padding: '4px 8px',
-                                display: 'flex',
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                                padding: "4px 8px",
+                                display: "flex",
                                 gap: 6,
                                 bottom: 32,
-                                left: '50%',
-                                transform: 'translateX(-50%)',
+                                left: "50%",
+                                transform: "translateX(-50%)",
                               }}
                               onMouseEnter={handlePopupEnter}
                               onMouseLeave={handlePopupLeave}
@@ -584,7 +955,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                               {REACTION_TYPES.map((r) => (
                                 <span
                                   key={r.type}
-                                  style={{ fontSize: 22, cursor: 'pointer', transition: 'transform 0.1s' }}
+                                  style={{
+                                    fontSize: 22,
+                                    cursor: "pointer",
+                                    transition: "transform 0.1s",
+                                  }}
                                   onClick={() => handleReact(r.type)}
                                 >
                                   {r.icon}
@@ -623,12 +998,216 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Message Input */}
       <div className={styles.messageInput}>
+        {/* File Preview Section */}
+        {previewFiles.length > 0 && (
+          <div className={styles.filePreviewContainer}>
+            {previewFiles.map((fileData, index) => (
+              <div key={index} className={styles.filePreviewItem}>
+                {/* Progress bar overlay when uploading */}
+                {fileData.uploadProgress !== undefined && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: "rgba(0,0,0,0.7)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 8,
+                      zIndex: 10,
+                    }}
+                  >
+                    <div style={{ textAlign: "center", color: "white" }}>
+                      <Progress
+                        type="circle"
+                        percent={fileData.uploadProgress}
+                        size={40}
+                        strokeColor="#1890ff"
+                      />
+                      <div style={{ fontSize: 12, marginTop: 4 }}>
+                        Đang tải lên...
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {fileData.type === "image" && fileData.preview && (
+                  <div className={styles.imagePreview}>
+                    <img
+                      src={fileData.preview}
+                      alt="Preview"
+                      style={{
+                        maxWidth: 100,
+                        maxHeight: 100,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                      }}
+                    />
+                    <button
+                      className={styles.removeFileBtn}
+                      onClick={() => removePreviewFile(index)}
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        background: "rgba(0,0,0,0.5)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: 20,
+                        height: 20,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {fileData.type === "video" && (
+                  <div
+                    className={styles.videoPreview}
+                    style={{ position: "relative" }}
+                  >
+                    <div
+                      style={{
+                        width: 100,
+                        height: 100,
+                        background: "#f0f0f0",
+                        borderRadius: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <span style={{ fontSize: 24 }}>🎥</span>
+                      <span style={{ fontSize: 12, marginTop: 4 }}>
+                        {fileData.file.name.substring(0, 10)}...
+                      </span>
+                    </div>
+                    <button
+                      className={styles.removeFileBtn}
+                      onClick={() => removePreviewFile(index)}
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        background: "rgba(0,0,0,0.5)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: 20,
+                        height: 20,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {fileData.type === "file" && (
+                  <div
+                    className={styles.filePreview}
+                    style={{ position: "relative" }}
+                  >
+                    <div
+                      style={{
+                        width: 100,
+                        height: 100,
+                        background: "#f0f0f0",
+                        borderRadius: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <span style={{ fontSize: 24 }}>📄</span>
+                      <span style={{ fontSize: 12, marginTop: 4 }}>
+                        {fileData.file.name.substring(0, 10)}...
+                      </span>
+                    </div>
+                    <button
+                      className={styles.removeFileBtn}
+                      onClick={() => removePreviewFile(index)}
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        background: "rgba(0,0,0,0.5)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: 20,
+                        height: 20,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+            ]
+          </div>
+        )}
+
         <div className={styles.inputContainer}>
-          <Button
-            type="text"
-            icon={<PaperClipOutlined />}
-            className={styles.inputAction}
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: "none" }}
+            multiple
           />
+
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "image",
+                  label: "Hình ảnh",
+                  icon: "🖼️",
+                  onClick: () => openFileDialog("image/*", "image"),
+                },
+                {
+                  key: "video",
+                  label: "Video",
+                  icon: "🎥",
+                  onClick: () => openFileDialog("video/*", "video"),
+                },
+                {
+                  key: "file",
+                  label: "Tệp tin",
+                  icon: "📄",
+                  onClick: () => openFileDialog("*/*", "file"),
+                },
+              ],
+            }}
+            trigger={["click"]}
+            placement="topLeft"
+          >
+            <Button
+              type="text"
+              icon={<PaperClipOutlined />}
+              className={styles.inputAction}
+            />
+          </Dropdown>
 
           <Input.TextArea
             value={messageInput}
@@ -644,39 +1223,66 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             content={
               <Tabs
                 defaultActiveKey="emoji"
-                items={[{
-                  key: "emoji",
-                  label: "Emoji",
-                  children: (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxWidth: 220 }}>
-                      {emojis.map((emoji) => (
-                        <span
-                          key={emoji}
-                          style={{ fontSize: 24, cursor: "pointer" }}
-                          onClick={() => handleSendReaction({ type: "emoji", value: emoji })}
-                        >
-                          {emoji}
-                        </span>
-                      ))}
-                    </div>
-                  ),
-                }, {
-                  key: "sticker",
-                  label: "Sticker",
-                  children: (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxWidth: 220 }}>
-                      {stickers.map((sticker) => (
-                        <img
-                          key={sticker.id}
-                          src={sticker.url}
-                          alt={sticker.id}
-                          style={{ width: 40, height: 40, cursor: "pointer" }}
-                          onClick={() => handleSendReaction({ type: "sticker", value: sticker.id })}
-                        />
-                      ))}
-                    </div>
-                  ),
-                }]}
+                items={[
+                  {
+                    key: "emoji",
+                    label: "Emoji",
+                    children: (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 8,
+                          maxWidth: 220,
+                        }}
+                      >
+                        {emojis.map((emoji) => (
+                          <span
+                            key={emoji}
+                            style={{ fontSize: 24, cursor: "pointer" }}
+                            onClick={() =>
+                              handleSendReaction({
+                                type: "emoji",
+                                value: emoji,
+                              })
+                            }
+                          >
+                            {emoji}
+                          </span>
+                        ))}
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "sticker",
+                    label: "Sticker",
+                    children: (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 8,
+                          maxWidth: 220,
+                        }}
+                      >
+                        {stickers.map((sticker) => (
+                          <img
+                            key={sticker.id}
+                            src={sticker.url}
+                            alt={sticker.id}
+                            style={{ width: 40, height: 40, cursor: "pointer" }}
+                            onClick={() =>
+                              handleSendReaction({
+                                type: "sticker",
+                                value: sticker.id,
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
+                    ),
+                  },
+                ]}
               />
             }
             trigger="click"
@@ -695,8 +1301,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             type="primary"
             icon={<SendOutlined />}
             onClick={handleSend}
-            loading={sending}
-            disabled={!messageInput.trim() || !isConnected}
+            loading={sending || uploading}
+            disabled={
+              (!messageInput.trim() && previewFiles.length === 0) ||
+              !isConnected ||
+              uploading
+            }
             className={styles.sendButton}
           />
         </div>
