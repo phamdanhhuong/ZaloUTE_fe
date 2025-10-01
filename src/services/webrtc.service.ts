@@ -26,6 +26,9 @@ export class WebRTCService {
   private onConnectionStateChangeCallback?: (state: RTCPeerConnectionState) => void;
   private onDataChannelMessageCallback?: (message: string) => void;
 
+  // Answer deduplication
+  private processedAnswers: Set<string> = new Set();
+
   constructor() {
     this.setupPeerConnection();
   }
@@ -47,10 +50,43 @@ export class WebRTCService {
 
       // Handle remote stream
       this.peerConnection.ontrack = (event) => {
-        console.log('Remote stream received');
-        this.remoteStream = event.streams[0];
-        if (this.onRemoteStreamCallback) {
-          this.onRemoteStreamCallback(this.remoteStream);
+        console.log('🎥 Remote stream received:', {
+          streams: event.streams.length,
+          tracks: event.track ? [event.track.kind] : [],
+          streamId: event.streams[0]?.id,
+          trackId: event.track?.id,
+          enabled: event.track?.enabled,
+          readyState: event.track?.readyState
+        });
+        
+        const newStream = event.streams[0];
+        
+        // Only update if it's a different stream or first time
+        if (!this.remoteStream || this.remoteStream.id !== newStream?.id) {
+          this.remoteStream = newStream;
+          
+          if (this.remoteStream) {
+            console.log('📹 Remote stream details:', {
+              id: this.remoteStream.id,
+              active: this.remoteStream.active,
+              videoTracks: this.remoteStream.getVideoTracks().length,
+              audioTracks: this.remoteStream.getAudioTracks().length,
+              videoTrackDetails: this.remoteStream.getVideoTracks().map(track => ({
+                id: track.id,
+                kind: track.kind,
+                enabled: track.enabled,
+                readyState: track.readyState,
+                settings: track.getSettings()
+              }))
+            });
+          }
+          
+          if (this.onRemoteStreamCallback) {
+            console.log('🔄 Triggering remote stream callback for new stream');
+            this.onRemoteStreamCallback(this.remoteStream);
+          }
+        } else {
+          console.log('⏭️ Skipping duplicate remote stream update');
         }
       };
 
@@ -85,9 +121,26 @@ export class WebRTCService {
       
       // Add tracks to peer connection
       if (this.peerConnection) {
-        stream.getTracks().forEach(track => {
-          this.peerConnection!.addTrack(track, stream);
+        console.log('🎯 Adding tracks to peer connection:', {
+          streamId: stream.id,
+          tracks: stream.getTracks().map(track => ({
+            id: track.id,
+            kind: track.kind,
+            enabled: track.enabled,
+            readyState: track.readyState
+          }))
         });
+        
+        stream.getTracks().forEach(track => {
+          const sender = this.peerConnection!.addTrack(track, stream);
+          console.log('✅ Track added:', {
+            trackId: track.id,
+            trackKind: track.kind,
+            senderId: sender ? 'created' : 'null'
+          });
+        });
+      } else {
+        console.warn('⚠️ No peer connection available to add tracks');
       }
 
       if (this.onLocalStreamCallback) {
@@ -134,10 +187,32 @@ export class WebRTCService {
     }
 
     try {
-      await this.peerConnection.setRemoteDescription(offer);
+      console.log('🔄 WebRTC: Current signaling state:', this.peerConnection.signalingState);
       
+      // Handle various signaling states more gracefully
+      if (this.peerConnection.signalingState === 'have-remote-offer') {
+        console.warn('⚠️ WebRTC: Already have remote offer, ignoring duplicate offer');
+        throw new Error('Duplicate offer - already have remote description');
+      }
+      
+      if (this.peerConnection.signalingState === 'have-local-offer') {
+        console.warn('⚠️ WebRTC: We already sent an offer, this might be a collision');
+        throw new Error('Offer collision - we already sent an offer');
+      }
+      
+      if (this.peerConnection.signalingState !== 'stable') {
+        console.warn('⚠️ WebRTC: Cannot handle offer in state:', this.peerConnection.signalingState);
+        throw new Error(`Cannot handle offer in signaling state: ${this.peerConnection.signalingState}`);
+      }
+      
+      // Set the remote description (offer)
+      await this.peerConnection.setRemoteDescription(offer);
+      console.log('✅ WebRTC: Remote description set, state now:', this.peerConnection.signalingState);
+      
+      // Create and set our answer
       const answer = await this.peerConnection.createAnswer();
       await this.peerConnection.setLocalDescription(answer);
+      console.log('✅ WebRTC: Answer created and local description set, state now:', this.peerConnection.signalingState);
       
       return answer;
     } catch (error) {
@@ -153,7 +228,34 @@ export class WebRTCService {
     }
 
     try {
-      await this.peerConnection.setRemoteDescription(answer);
+      // Generate answer hash for deduplication
+      const answerHash = btoa(JSON.stringify(answer))
+      
+      // Check for duplicate answer
+      if (this.processedAnswers.has(answerHash)) {
+        console.log('� Service: Duplicate answer ignored', {
+          hash: answerHash.substring(0, 10) + '...',
+          signalingState: this.peerConnection.signalingState
+        })
+        return
+      }
+
+      console.log('�🔄 WebRTC: Current signaling state before answer:', this.peerConnection.signalingState);
+      
+      // Only set remote description if we're in the right state (have-local-offer)
+      if (this.peerConnection.signalingState === 'have-local-offer') {
+        // Mark answer as processed before handling
+        this.processedAnswers.add(answerHash)
+
+        await this.peerConnection.setRemoteDescription(answer);
+        console.log('✅ WebRTC: Answer processed successfully', {
+          hash: answerHash.substring(0, 10) + '...',
+          signalingState: this.peerConnection.signalingState
+        });
+      } else {
+        console.warn('⚠️ WebRTC: Ignoring answer in state:', this.peerConnection.signalingState);
+        throw new Error(`Cannot handle answer in signaling state: ${this.peerConnection.signalingState}`);
+      }
     } catch (error) {
       console.error('Failed to handle answer:', error);
       throw new Error('Failed to handle call answer');
@@ -167,7 +269,13 @@ export class WebRTCService {
     }
 
     try {
-      await this.peerConnection.addIceCandidate(candidate);
+      // Only add ICE candidate if we have remote description
+      if (this.peerConnection.remoteDescription) {
+        await this.peerConnection.addIceCandidate(candidate);
+        console.log('✅ WebRTC: ICE candidate added successfully');
+      } else {
+        console.warn('⚠️ WebRTC: Ignoring ICE candidate - no remote description set yet');
+      }
     } catch (error) {
       console.error('Failed to handle ICE candidate:', error);
     }
@@ -450,6 +558,9 @@ export class WebRTCService {
 
     // Clear remote stream
     this.remoteStream = null;
+
+    // Clear deduplication tracking
+    this.processedAnswers.clear();
 
     // Clear callbacks
     this.onLocalStreamCallback = undefined;

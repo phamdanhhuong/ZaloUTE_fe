@@ -24,7 +24,7 @@ axiosClient.interceptors.request.use((config) => {
 axiosClient.interceptors.response.use(
   (response) => {
     // Log để debug
-    console.log("Full response:", response.data);
+    // console.log("Full response:", response.data);
 
     // Nếu server trả về cấu trúc { statusCode, message, data }
     // thì lấy data bên trong, otherwise return toàn bộ

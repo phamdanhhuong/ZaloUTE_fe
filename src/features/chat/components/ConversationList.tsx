@@ -39,11 +39,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const [showGroupSettingsModal, setShowGroupSettingsModal] = useState(false);
   const [selectedGroupForSettings, setSelectedGroupForSettings] = useState<Conversation | null>(null);
 
-  console.log('ConversationList currentUser prop:', currentUser); // Debug log
-  console.log('ConversationList currentUser.id:', currentUser?.id); // Debug log
 
   const getConversationName = (conversation: Conversation) => {
-    console.log('Getting name for conversation:', conversation); // Debug log
     
     if (conversation.name) {
       return conversation.name;
@@ -55,9 +52,6 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     }
 
     // For 1-on-1 conversation, get the other participant's name
-    console.log('Participants:', conversation.participants); // Debug log
-    console.log('Participants detailed structure:', JSON.stringify(conversation.participants, null, 2));
-    console.log('Current user ID:', currentUser?.id);
     
     if (!conversation.participants || conversation.participants.length === 0) {
       return "Cuộc trò chuyện";
@@ -66,11 +60,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     // With the simplified backend structure, participants is an array of User objects directly
     const otherParticipant = conversation.participants.find(user => {
       const userId = user._id;
-      console.log('Checking user ID:', userId, 'vs current user:', currentUser?.id);
       return userId && userId !== currentUser?.id;
     });
 
-    console.log('Other participant:', otherParticipant); // Debug log
 
     if (otherParticipant) {
       const firstName = otherParticipant.firstname || '';
@@ -232,7 +224,6 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
   const handleGroupSettingsClick = (conversation: Conversation, e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('Opening group settings for:', conversation.name);
     setSelectedGroupForSettings(conversation);
     setShowGroupSettingsModal(true);
   };
@@ -253,12 +244,6 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     const isAdmin = conversation.groupAdmin?._id === currentUser?.id;
     const isMember = conversation.participants.some(p => p._id === currentUser?.id);
 
-    console.log('Group action menu for:', conversation.name, {
-      isAdmin,
-      isMember,
-      currentUserId: currentUser?.id,
-      groupAdminId: conversation.groupAdmin?._id
-    });
 
     if (!isMember) return undefined;
 

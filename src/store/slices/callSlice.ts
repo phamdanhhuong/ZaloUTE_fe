@@ -30,74 +30,129 @@ const initialState: CallState = {
 
 // Async thunks for API calls
 
-// Initiate call via REST API
+// Initiate call via WebSocket
 export const initiateCallAsync = createAsyncThunk(
   'call/initiateCall',
-  async (payload: { receiverId: string; callType: CallType; token: string }) => {
-    const response = await axios.post<ApiResponse<Call>>(
-      `${process.env.NEXT_PUBLIC_API_URL}/calls/initiate`,
-      {
-        receiverId: payload.receiverId,
-        callType: payload.callType,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${payload.token}`,
-        },
+  async (payload: { receiverId: string; callType: CallType; token: string }, { rejectWithValue }) => {
+    try {
+      // Import callSocketService
+      const { callSocketService } = await import('@/services/call-socket.service');
+      
+      // Ensure socket is connected
+      if (!callSocketService.isConnectedToSocket()) {
+        await callSocketService.connect(payload.token);
       }
-    );
-    return response.data;
+      
+      // Initiate call via WebSocket
+      callSocketService.initiateCall(payload.receiverId, payload.callType);
+      
+      // Return a success response (the actual call data will come via WebSocket events)
+      return {
+        success: true,
+        message: 'Call initiation request sent',
+        data: null
+      };
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to initiate call');
+    }
   }
 );
 
-// Accept call via REST API
+// Accept call via WebSocket
 export const acceptCallAsync = createAsyncThunk(
   'call/acceptCall',
-  async (payload: { callId: string; token: string }) => {
-    const response = await axios.put<ApiResponse<Call>>(
-      `${process.env.NEXT_PUBLIC_API_URL}/calls/${payload.callId}/accept`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${payload.token}`,
-        },
+  async (payload: { callId: string; token: string }, { rejectWithValue }) => {
+    console.log('🚀 Redux acceptCallAsync: Starting with payload:', payload);
+    try {
+      // Import callSocketService
+      const { callSocketService } = await import('@/services/call-socket.service');
+      
+      console.log('🚀 Redux acceptCallAsync: Socket connected status:', callSocketService.isConnectedToSocket());
+      
+      // Ensure socket is connected
+      if (!callSocketService.isConnectedToSocket()) {
+        console.log('🚀 Redux acceptCallAsync: Socket not connected, attempting to connect...');
+        await callSocketService.connect(payload.token);
       }
-    );
-    return response.data;
+      
+      console.log('🚀 Redux acceptCallAsync: Calling acceptCall on socket service');
+      // Accept call via WebSocket
+      callSocketService.acceptCall(payload.callId);
+      
+      console.log('🚀 Redux acceptCallAsync: Accept call request sent successfully');
+      // Return a success response (the actual call data will come via WebSocket events)
+      return {
+        success: true,
+        message: 'Call accept request sent',
+        data: null
+      };
+    } catch (error: any) {
+      console.error('❌ Redux acceptCallAsync: Error:', error);
+      return rejectWithValue(error.message || 'Failed to accept call');
+    }
   }
 );
 
-// Reject call via REST API
+// Reject call via WebSocket
 export const rejectCallAsync = createAsyncThunk(
   'call/rejectCall',
-  async (payload: { callId: string; reason?: string; token: string }) => {
-    const response = await axios.put<ApiResponse<Call>>(
-      `${process.env.NEXT_PUBLIC_API_URL}/calls/${payload.callId}/reject`,
-      { reason: payload.reason },
-      {
-        headers: {
-          Authorization: `Bearer ${payload.token}`,
-        },
+  async (payload: { callId: string; reason?: string; token: string }, { rejectWithValue }) => {
+    console.log('🚀 Redux rejectCallAsync: Starting with payload:', payload);
+    try {
+      // Import callSocketService
+      const { callSocketService } = await import('@/services/call-socket.service');
+      
+      console.log('🚀 Redux rejectCallAsync: Socket connected status:', callSocketService.isConnectedToSocket());
+      
+      // Ensure socket is connected
+      if (!callSocketService.isConnectedToSocket()) {
+        console.log('🚀 Redux rejectCallAsync: Socket not connected, attempting to connect...');
+        await callSocketService.connect(payload.token);
       }
-    );
-    return response.data;
+      
+      console.log('🚀 Redux rejectCallAsync: Calling rejectCall on socket service');
+      // Reject call via WebSocket
+      callSocketService.rejectCall(payload.callId, payload.reason);
+      
+      console.log('🚀 Redux rejectCallAsync: Reject call request sent successfully');
+      // Return a success response (the actual call data will come via WebSocket events)
+      return {
+        success: true,
+        message: 'Call reject request sent',
+        data: null
+      };
+    } catch (error: any) {
+      console.error('❌ Redux rejectCallAsync: Error:', error);
+      return rejectWithValue(error.message || 'Failed to reject call');
+    }
   }
 );
 
-// End call via REST API
+// End call via WebSocket
 export const endCallAsync = createAsyncThunk(
   'call/endCall',
-  async (payload: { callId: string; reason?: string; token: string }) => {
-    const response = await axios.put<ApiResponse<Call>>(
-      `${process.env.NEXT_PUBLIC_API_URL}/calls/${payload.callId}/end`,
-      { reason: payload.reason },
-      {
-        headers: {
-          Authorization: `Bearer ${payload.token}`,
-        },
+  async (payload: { callId: string; reason?: string; token: string }, { rejectWithValue }) => {
+    try {
+      // Import callSocketService
+      const { callSocketService } = await import('@/services/call-socket.service');
+      
+      // Ensure socket is connected
+      if (!callSocketService.isConnectedToSocket()) {
+        await callSocketService.connect(payload.token);
       }
-    );
-    return response.data;
+      
+      // End call via WebSocket
+      callSocketService.endCall(payload.callId, payload.reason);
+      
+      // Return a success response (the actual call data will come via WebSocket events)
+      return {
+        success: true,
+        message: 'Call end request sent',
+        data: null
+      };
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to end call');
+    }
   }
 );
 
@@ -133,10 +188,18 @@ const callSlice = createSlice({
 
     // Stream management
     setLocalStream: (state, action: PayloadAction<MediaStream | null>) => {
+      console.log('🏪 Redux: Setting local stream:', action.payload);
       state.localStream = action.payload;
     },
 
     setRemoteStream: (state, action: PayloadAction<MediaStream | null>) => {
+      console.log('🏪 Redux: Setting remote stream:', {
+        stream: action.payload,
+        id: action.payload?.id,
+        active: action.payload?.active,
+        videoTracks: action.payload?.getVideoTracks().length,
+        audioTracks: action.payload?.getAudioTracks().length
+      });
       state.remoteStream = action.payload;
     },
 
@@ -250,7 +313,7 @@ const callSlice = createSlice({
         callId,
         call,
         caller,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(), // Serialize to string
       };
       
       state.incomingCall = incomingCall;
@@ -259,25 +322,34 @@ const callSlice = createSlice({
     handleCallAccepted: (state, action: PayloadAction<{ call: Call; acceptedBy: string }>) => {
       const { call } = action.payload;
       
-      if (state.currentCall) {
+      // Create active call object for both caller and receiver
+      const activeCall: ActiveCall = {
+        callId: call._id!,
+        participants: [],
+        callType: call.callType,
+        status: CallStatus.ACCEPTED,
+        startTime: new Date(),
+        duration: 0,
+        isConnected: true,
+      };
+      
+      // Update existing currentCall if it exists (for caller)
+      if (state.currentCall && state.currentCall.callId === call._id) {
         state.currentCall.status = CallStatus.ACCEPTED;
         state.currentCall.isConnected = true;
+        state.callWindow.isOpen = true;
+        state.callWindow.callId = call._id!;
       }
-      
-      // Clear incoming call if it was accepted by current user
-      if (state.incomingCall && state.incomingCall.callId === call._id) {
-        const activeCall: ActiveCall = {
-          callId: call._id!,
-          participants: [],
-          callType: call.callType,
-          status: CallStatus.ACCEPTED,
-          startTime: new Date(),
-          duration: 0,
-          isConnected: true,
-        };
-        
+      // Handle incoming call being accepted (for receiver)
+      else if (state.incomingCall && state.incomingCall.callId === call._id) {
         state.currentCall = activeCall;
         state.incomingCall = null;
+        state.callWindow.isOpen = true;
+        state.callWindow.callId = call._id!;
+      }
+      // Handle case where we don't have currentCall or incomingCall (backup)
+      else if (!state.currentCall) {
+        state.currentCall = activeCall;
         state.callWindow.isOpen = true;
         state.callWindow.callId = call._id!;
       }
@@ -289,19 +361,28 @@ const callSlice = createSlice({
       }
     },
 
-    handleCallRejected: (state, action: PayloadAction<{ call: Call; rejectedBy: string; reason?: string }>) => {
-      const { call } = action.payload;
+    handleCallRejected: (state, action: PayloadAction<{ callId: string; call: Call; rejectedBy: string; reason?: string }>) => {
+      const { callId, call } = action.payload;
+      console.log('🔄 Redux handleCallRejected: Payload:', action.payload);
+      console.log('🔄 Redux handleCallRejected: Current incomingCall:', state.incomingCall);
       
       // Clear current call if it was rejected
-      if (state.currentCall && state.currentCall.callId === call._id) {
+      if (state.currentCall && (state.currentCall.callId === callId || state.currentCall.callId === call._id)) {
+        console.log('🔄 Redux handleCallRejected: Clearing currentCall');
         state.currentCall = null;
         state.callWindow.isOpen = false;
         state.callWindow.callId = null;
       }
       
       // Clear incoming call
-      if (state.incomingCall && state.incomingCall.callId === call._id) {
+      if (state.incomingCall && (state.incomingCall.callId === callId || state.incomingCall.callId === call._id)) {
+        console.log('🔄 Redux handleCallRejected: Clearing incomingCall');
         state.incomingCall = null;
+      } else {
+        console.log('🔄 Redux handleCallRejected: IncomingCall not matched or not exists');
+        console.log('🔄 Redux handleCallRejected: incomingCall callId:', state.incomingCall?.callId);
+        console.log('🔄 Redux handleCallRejected: rejected call id (callId):', callId);
+        console.log('🔄 Redux handleCallRejected: rejected call id (call._id):', call._id);
       }
       
       // Update call in history

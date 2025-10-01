@@ -38,6 +38,7 @@ import {
   CrownOutlined,
 } from "@ant-design/icons";
 import { UserAvatar } from "@/components/UserAvatar";
+import { CallButton } from "@/components/call";
 import { useSocket } from "../hooks/useSocket";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
@@ -62,7 +63,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   conversation,
   onConversationUpdate,
 }) => {
-  console.log("ChatAreaNew received conversation:", conversation);
 
   const dispatch = useDispatch();
   const {
@@ -131,16 +131,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Set active conversation and load messages
   useEffect(() => {
     if (conversation && conversation._id !== activeConversationId) {
-      console.log("Setting active conversation:", conversation._id);
       dispatch(setActiveConversationId(conversation._id));
 
       // Use async functions properly
       const initializeConversation = async () => {
         try {
-          console.log(
-            "Joining conversation and loading messages for:",
-            conversation._id
-          );
+
           await joinConversation(conversation._id);
           await getMessages({ conversationId: conversation._id, limit: 50 });
 
@@ -170,11 +166,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       activeConversationId &&
       activeConversationId === conversation?._id
     ) {
-      // Rejoin conversation and reload messages when socket reconnects
-      console.log(
-        "Socket reconnected, rejoining conversation:",
-        activeConversationId
-      );
 
       const reconnectConversation = async () => {
         try {
@@ -228,6 +219,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
 
     return "Cuộc trò chuyện";
+  };
+
+  const getOtherParticipantId = () => {
+    if (!conversation || conversation.type === "group") return "";
+    
+    // Find the participant that is not the current user
+    const otherParticipant = conversation.participants?.find(
+      (participantId) => participantId !== currentUser?.id
+    );
+    
+    return otherParticipant || "";
   };
 
   const isGroupAdmin =
@@ -303,18 +305,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   ) => {
     if ((!content.trim() && !file) || sending || !conversation) return;
 
-    console.log(
-      "Sending message:",
-      content,
-      "type:",
-      type,
-      "file:",
-      file?.name,
-      "to conversation:",
-      conversation._id,
-      "isConnected:",
-      isConnected
-    );
 
     setSending(true);
     setUploading(!!file);
@@ -325,7 +315,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       // If sending a file, upload it first
       if (file) {
-        console.log("Uploading file:", file.name);
 
         // Update progress for this specific file
         if (fileIndex !== undefined) {
@@ -360,7 +349,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           fileUrl = uploadResult.url;
           messageContent = uploadResult.url; // Send the uploaded file URL
-          console.log("File uploaded successfully:", fileUrl);
         } catch (uploadError) {
           console.error("File upload failed:", uploadError);
           throw new Error(`Failed to upload file: ${file.name}`);
@@ -372,7 +360,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         content: messageContent.trim() || fileUrl || file?.name || "",
         type,
       });
-      console.log("Message sent successfully");
 
       // Clear input and files only if not sending multiple files
       if (!file || fileIndex === undefined) {
@@ -564,16 +551,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     if (!conversation) return;
 
-    console.log(
-      "Input change, isConnected:",
-      isConnected,
-      "conversation:",
-      conversation._id
-    );
 
     // Handle typing indicators
     if (value.trim()) {
-      console.log("Starting typing for conversation:", conversation._id);
       startTyping(conversation._id);
 
       // Clear existing timeout
@@ -583,17 +563,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       // Set new timeout to stop typing after 3 seconds of inactivity
       typingTimeoutRef.current = setTimeout(() => {
-        console.log("Stopping typing for conversation:", conversation._id);
         stopTyping(conversation._id);
       }, 3000);
     } else {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      console.log(
-        "Stopping typing (empty input) for conversation:",
-        conversation._id
-      );
       stopTyping(conversation._id);
     }
   };
@@ -692,11 +667,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             icon={<SearchOutlined />}
             className={styles.actionButton}
           />
-          <Button
-            type="text"
-            icon={<PhoneOutlined />}
-            className={styles.actionButton}
-          />
+          {/* Call Button - only show for 1-on-1 conversations */}
+          {conversation.type !== "group" && (
+            <CallButton
+              userId={getOtherParticipantId()}
+              userName={getConversationName()}
+              compact={true}
+              style={{ border: 'none', boxShadow: 'none' }}
+            />
+          )}
           <Button
             type="text"
             icon={<TeamOutlined />}

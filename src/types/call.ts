@@ -84,7 +84,7 @@ export interface IncomingCall {
   callId: string;
   call: Call;
   caller: CallUser;
-  timestamp: Date;
+  timestamp: string; // Use string instead of Date for Redux serialization
 }
 
 // Call User
@@ -251,6 +251,10 @@ export interface UseCallReturn {
   isLoading: boolean;
   error: string | null;
   
+  // Error Handling
+  currentError: any; // CallError from error handler
+  isRecovering: boolean;
+  
   // Actions
   initiateCall: (receiverId: string, callType: CallType) => Promise<void>;
   acceptCall: (callId: string) => Promise<void>;
@@ -262,9 +266,14 @@ export interface UseCallReturn {
   toggleVideo: () => void;
   switchCamera: () => void;
   
+  // Media Status
+  isAudioEnabled: boolean;
+  isVideoEnabled: boolean;
+  
   // Utility
   clearError: () => void;
   getCallHistory: () => Promise<Call[]>;
+  connectToCallService: () => Promise<void>;
 }
 
 // Component Props

@@ -1,9 +1,9 @@
 import io from 'socket.io-client';
 import { 
   CallEvent, 
-  CallEventPayload, 
-  CallType, 
-  Call, 
+  CallEventPayload,
+  Call,
+  CallType,
   CallUser, 
   IncomingCall,
   WebRTCSignal 
@@ -42,17 +42,19 @@ export class CallSocketService {
   // Connect to call socket namespace
   async connect(authToken: string): Promise<void> {
     if (this.socket?.connected) {
-      console.log('Already connected to call socket');
       return;
     }
 
     this.authToken = authToken;
 
     try {
-      const serverUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8000';
+      // Extract base URL from socket URL (remove /chat if present)
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8080/chat';
+      const serverUrl = socketUrl.replace('/chat', '');
+      console.log('🔗 Call socket connecting to:', `${serverUrl}/call`);
       
       this.socket = io(`${serverUrl}/call`, {
-        auth: {
+        query: {
           token: authToken,
         },
         transports: ['websocket', 'polling'],
@@ -69,12 +71,12 @@ export class CallSocketService {
       // Wait for connection
       await this.waitForConnection();
       
-      console.log('Connected to call socket successfully');
       this.isConnected = true;
       
     } catch (error) {
-      console.error('Failed to connect to call socket:', error);
-      throw new Error('Failed to connect to call service');
+      console.error('Call socket connection failed:', error);
+      this.isConnected = false;
+      // Don't throw error - allow app to continue without call service
     }
   }
 
@@ -107,29 +109,29 @@ export class CallSocketService {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('Call socket connected');
       this.isConnected = true;
     });
 
     this.socket.on('disconnect', (reason: any) => {
-      console.log('Call socket disconnected:', reason);
       this.isConnected = false;
       
       // Attempt to reconnect after a delay
       if (reason === 'io server disconnect') {
-        // Server disconnected, manual reconnect needed
         setTimeout(() => this.reconnect(), 5000);
       }
     });
 
     this.socket.on('connect_error', (error: any) => {
-      console.error('Call socket connection error:', error);
       this.isConnected = false;
     });
 
     this.socket.on('reconnect', (attemptNumber: any) => {
-      console.log('Call socket reconnected after', attemptNumber, 'attempts');
       this.isConnected = true;
+    });
+
+    // Add authentication error handling
+    this.socket.on('auth_error', (error: any) => {
+      console.error('Auth error:', error);
     });
   }
 
@@ -151,6 +153,7 @@ export class CallSocketService {
     });
 
     this.socket.on('call:rejected', (data: any) => {
+      console.log('📨 Frontend: Received call:rejected event:', data);
       this.emitToListeners('call:rejected', data);
     });
 
@@ -159,6 +162,7 @@ export class CallSocketService {
     });
 
     this.socket.on('call:error', (data: any) => {
+      console.error('Call error:', data);
       this.emitToListeners('call:error', data);
     });
 
@@ -177,11 +181,11 @@ export class CallSocketService {
 
     // Call participant events
     this.socket.on('call:participant-joined', (data: any) => {
-      console.log('Participant joined call:', data);
+      // Handle participant join
     });
 
     this.socket.on('call:media-status-changed', (data: any) => {
-      console.log('Participant media status changed:', data);
+      // Handle media status change
     });
   }
 
@@ -201,7 +205,14 @@ export class CallSocketService {
   
   // Initiate a call
   initiateCall(receiverId: string, callType: CallType, metadata?: string): void {
-    if (!this.isSocketReady()) return;
+    console.log('🚀 Frontend: initiateCall called with:', { receiverId, callType, metadata });
+    console.log('🚀 Frontend: Socket connected:', !!this.socket?.connected);
+    console.log('🚀 Frontend: isConnected flag:', this.isConnected);
+    
+    if (!this.isSocketReady()) {
+      console.log('❌ Frontend: Socket not ready, aborting call initiation');
+      return;
+    }
 
     const payload: CallEventPayload['call:initiate'] = {
       receiverId,
@@ -209,22 +220,41 @@ export class CallSocketService {
       metadata,
     };
 
+    console.log('📤 Frontend: Emitting call:initiate with payload:', payload);
     this.socket!.emit('call:initiate', payload);
   }
 
   // Accept an incoming call
   acceptCall(callId: string): void {
-    if (!this.isSocketReady()) return;
+    console.log('✅ Frontend: acceptCall called with callId:', callId);
+    console.log('✅ Frontend: Socket exists:', !!this.socket);
+    console.log('✅ Frontend: Socket connected:', !!this.socket?.connected);
+    console.log('✅ Frontend: isConnected flag:', this.isConnected);
+    console.log('✅ Frontend: isSocketReady result:', this.isSocketReady());
+    
+    if (!this.isSocketReady()) {
+      console.log('❌ Frontend: Socket not ready, aborting call accept');
+      return;
+    }
 
     const payload: CallEventPayload['call:accept'] = { callId };
+    console.log('📤 Frontend: Emitting call:accept with payload:', payload);
     this.socket!.emit('call:accept', payload);
+    console.log('📤 Frontend: call:accept event emitted successfully');
   }
 
   // Reject an incoming call
   rejectCall(callId: string, reason?: string): void {
-    if (!this.isSocketReady()) return;
+    console.log('❌ Frontend: rejectCall called with callId:', callId, 'reason:', reason);
+    console.log('❌ Frontend: Socket connected:', !!this.socket?.connected);
+    
+    if (!this.isSocketReady()) {
+      console.log('❌ Frontend: Socket not ready, aborting call reject');
+      return;
+    }
 
     const payload: CallEventPayload['call:reject'] = { callId, reason };
+    console.log('📤 Frontend: Emitting call:reject with payload:', payload);
     this.socket!.emit('call:reject', payload);
   }
 
@@ -325,8 +355,16 @@ export class CallSocketService {
 
   // Check if socket is ready
   private isSocketReady(): boolean {
-    if (!this.socket || !this.isConnected) {
-      console.warn('Socket not connected. Cannot emit events.');
+    if (!this.socket) {
+      console.warn('❌ Socket is null/undefined');
+      return false;
+    }
+    if (!this.isConnected) {
+      console.warn('❌ Socket isConnected flag is false');
+      return false;
+    }
+    if (!this.socket.connected) {
+      console.warn('❌ Socket.connected is false');
       return false;
     }
     return true;
@@ -335,7 +373,7 @@ export class CallSocketService {
   // Reconnect to socket
   private async reconnect(): Promise<void> {
     if (this.authToken) {
-      console.log('Attempting to reconnect to call socket...');
+  
       try {
         await this.connect(this.authToken);
       } catch (error) {
@@ -357,7 +395,7 @@ export class CallSocketService {
   // Disconnect from socket
   disconnect(): void {
     if (this.socket) {
-      console.log('Disconnecting from call socket');
+  
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;

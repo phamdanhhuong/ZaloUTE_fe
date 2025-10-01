@@ -36,8 +36,10 @@ import {
 import type { Conversation } from "@/features/chat/service";
 import type { User } from "@/features/friend/service";
 import type { SocketConversation } from "@/infrastructure/socket/socketService";
+import { CallButton, CallHistory } from "@/components/call";
+import { useCall } from "@/hooks/useCall";
 
-type ActiveView = "chat" | "friends" | "friend-list" | "groups";
+type ActiveView = "chat" | "friends" | "friend-list" | "groups" | "calls";
 type FriendTab = "friends" | "groups" | "friend-requests" | "group-invites";
 
 export const ZaloLayout: React.FC = () => {
@@ -63,6 +65,9 @@ export const ZaloLayout: React.FC = () => {
   // Socket integration
   const { isConnected, connect, disconnect, joinConversation } = useSocket();
   
+  // Call integration
+  const { connectToCallService } = useCall();
+  
   // Connect to socket when component mounts
   useEffect(() => {
     if (currentUser && !isConnected) {
@@ -70,6 +75,8 @@ export const ZaloLayout: React.FC = () => {
       console.log("Token available:", !!token);
       if (token) {
         connect();
+        // Also connect to call service
+        connectToCallService();
       }
     }
     
@@ -79,7 +86,7 @@ export const ZaloLayout: React.FC = () => {
         disconnect();
       }
     };
-  }, [currentUser, isConnected, token, connect, disconnect]);
+  }, [currentUser, isConnected, token, connect, disconnect, connectToCallService]);
 
   // Auto-join conversation when socket connects
   useEffect(() => {
@@ -133,14 +140,12 @@ export const ZaloLayout: React.FC = () => {
     }
 
     try {
-      console.log("Creating conversation with friend:", friend);
       // Create or get existing conversation with this friend
       const conversation = await createConversation({
         participantIds: [friend.id], // Only send friend ID, current user will be added automatically
         isGroup: false
       });
       
-      console.log("Received conversation:", conversation);
       
       // Convert to SocketConversation format
       const socketConversation: SocketConversation = {
@@ -152,7 +157,6 @@ export const ZaloLayout: React.FC = () => {
         updatedAt: conversation.updatedAt,
       };
       
-      console.log("Created socketConversation with ID:", socketConversation._id);
       setSelectedConversation(socketConversation);
       setActiveView("chat");
       
@@ -187,7 +191,6 @@ export const ZaloLayout: React.FC = () => {
   const groups = conversations
     .filter(conv => conv.type === 'group' || conv.isGroup)
     .map(conv => {
-      console.log('Conversation for group:', conv); // Debug log
       return {
         id: conv._id || conv.id || '',
         name: conv.name || conv.groupName || `Nhóm ${conv.participants?.length || 0} thành viên`,
@@ -240,10 +243,18 @@ export const ZaloLayout: React.FC = () => {
 
     switch (activeView) {
       case "chat":
-        console.log('Rendering ChatAreaNew with selectedConversation:', selectedConversation);
         return <ChatAreaNew conversation={selectedConversation} />;
       case "friends":
         return renderFriendTabContent();
+      case "calls":
+        return (
+          <div className="empty-state" style={{ padding: '40px', textAlign: 'center' }}>
+            <PhoneOutlined style={{ fontSize: '48px', color: '#ccc', marginBottom: '16px' }} />
+            <h3>Lịch sử cuộc gọi</h3>
+            <p>Xem lịch sử cuộc gọi của bạn ở sidebar bên trái.</p>
+            <p>Để bắt đầu cuộc gọi, hãy chọn một cuộc trò chuyện và nhấn nút gọi điện.</p>
+          </div>
+        );
       default:
         return <div className="empty-state">Chọn một mục để bắt đầu</div>;
     }
@@ -272,12 +283,10 @@ export const ZaloLayout: React.FC = () => {
         return (
           <FriendRequests
             onAcceptRequest={(requestId) => {
-              console.log("Accepted friend request:", requestId);
               // Refresh friend requests and friends list
               loadPendingRequests();
             }}
             onRejectRequest={(requestId) => {
-              console.log("Rejected friend request:", requestId);
               // Refresh friend requests
               loadPendingRequests();
             }}
@@ -333,10 +342,6 @@ export const ZaloLayout: React.FC = () => {
 
   // Convert regular conversation to socket conversation format
   const handleConversationSelect = (conversation: Conversation) => {
-    console.log('Conversation selected:', conversation);
-    console.log('Conversation._id:', conversation._id);
-    console.log('Conversation.id:', conversation.id);
-    console.log('Conversation participants:', conversation.participants);
     
     const socketConversation: SocketConversation = {
       _id: conversation._id || conversation.id || '', // Handle both _id and id with fallback
@@ -347,15 +352,10 @@ export const ZaloLayout: React.FC = () => {
       updatedAt: conversation.updatedAt,
     };
     
-    console.log('Created socketConversation:', socketConversation);
-    console.log('socketConversation._id:', socketConversation._id);
     setSelectedConversation(socketConversation);
     
     // Join conversation room only if socket is connected
-    console.log('Socket connection state - isConnected:', isConnected);
-    console.log('Socket conversation ID exists:', !!socketConversation._id);
     if (socketConversation._id && isConnected) {
-      console.log('Attempting to join conversation:', socketConversation._id);
       joinConversation(socketConversation._id);
     } else if (!isConnected) {
       console.warn("Socket not connected, conversation will be joined when connected");
@@ -381,6 +381,15 @@ export const ZaloLayout: React.FC = () => {
             onViewProfile={handleViewProfile}
             onTabChange={handleFriendTabChange}
             activeTab={selectedFriendTab}
+          />
+        );
+      case "calls":
+        return (
+          <CallHistory
+            userId={currentUser?.id}
+            showActions={true}
+            compact={false}
+            style={{ border: 'none', boxShadow: 'none' }}
           />
         );
       default:
@@ -440,6 +449,15 @@ export const ZaloLayout: React.FC = () => {
               <div className="notification-badge">{friendRequests.length}</div>
             )}
           </div>
+
+          <Button
+            className={`nav-button ${activeView === "calls" ? "active" : ""}`}
+            onClick={() => {
+              setActiveView("calls");
+              setShowUserProfile(false);
+            }}
+            icon={<PhoneOutlined />}
+          />
         </div>
 
         {/* Bottom Icons */}
@@ -460,8 +478,9 @@ export const ZaloLayout: React.FC = () => {
               <h1 className="title-text">
                 {activeView === "chat" && `Zalo - ${getUserDisplayName()}`}
                 {activeView === "friends" && "Danh sách bạn bè"}
+                {activeView === "calls" && "Cuộc gọi"}
                 {/* Socket connection status */}
-                {activeView === "chat" && (
+                {(activeView === "chat" || activeView === "calls") && (
                   <span 
                     style={{ 
                       marginLeft: 8, 

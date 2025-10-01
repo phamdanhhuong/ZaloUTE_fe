@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { Provider } from "react-redux";
 import { store } from "@/store";
 import { initializeFromStorage } from "@/store/slices/userSlice";
+import { CallProvider } from "@/components/call";
 import "@ant-design/v5-patch-for-react-19";
 
 function ReduxInitializer({ children }: { children: React.ReactNode }) {
@@ -17,7 +18,11 @@ function ReduxInitializer({ children }: { children: React.ReactNode }) {
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <Provider store={store}>
-      <ReduxInitializer>{children}</ReduxInitializer>
+      <ReduxInitializer>
+        <CallProvider>
+          {children}
+        </CallProvider>
+      </ReduxInitializer>
     </Provider>
   );
 }
