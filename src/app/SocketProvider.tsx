@@ -105,7 +105,7 @@ export default function SocketProvider({ children }: { children: React.ReactNode
     return () => {
       mounted = false;
     };
-  }, [tokenFromStore]);
+  }, [token]);
 
   // disconnect when token removed
   useEffect(() => {
@@ -118,7 +118,7 @@ export default function SocketProvider({ children }: { children: React.ReactNode
       }
       setConnected(false);
     }
-  }, [tokenFromStore]);
+  }, [token]);
 
   // expose connection state via a global for quick debugging in dev
   useEffect(() => {

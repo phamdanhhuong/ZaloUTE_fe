@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import socketService from "../infrastructure/socket/socketService";
+import { notification } from 'antd';
 
 interface Props {
   room?: string;
@@ -129,12 +130,24 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
       }
     });
 
-    unsubLeft = socketService.onCallUserLeft((data) => {
-      if (peersRef.current.has(data.socketId)) {
-        peersRef.current.delete(data.socketId);
+    unsubLeft = socketService.onCallUserLeft((data: any) => {
+      const id = data.socketId;
+      const username = data.username || data.userId || id;
+      if (peersRef.current.has(id)) {
+        peersRef.current.delete(id);
         setPeers(Array.from(peersRef.current));
       }
       if (remoteRef.current) remoteRef.current.srcObject = null;
+      // show notification to remaining participants with username
+      try {
+        notification.info({
+          message: 'Thành viên rời cuộc gọi',
+          description: `Người dùng ${username} đã rời cuộc gọi`,
+          placement: 'bottomRight',
+        });
+      } catch (e) {
+        console.log('Notification failed', e);
+      }
     });
 
     // init media + peer
