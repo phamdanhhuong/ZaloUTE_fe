@@ -27,6 +27,22 @@ export interface SocketConversation {
   name?: string;
   avatar?: string;
   groupAdmin?: string; // Group admin ID
+  lastMessage?: {
+    _id: string;
+    content: string;
+    type: "text" | "image" | "video" | "file" | "emoji" | "sticker";
+    sender: {
+      _id: string;
+      username: string;
+      email: string;
+      firstname: string;
+      lastname: string;
+      avatarUrl: string;
+    };
+    isRead: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -97,6 +113,8 @@ export const SOCKET_EVENTS = {
   RECEIVE_MESSAGE: "receive_message",
   GET_MESSAGES: "get_messages",
   GET_MESSAGES_RESULT: "get_messages_result",
+  MARK_AS_READ: "mark_as_read",
+  MESSAGES_READ: "messages_read",
 
   // Conversation events
   GET_CONVERSATIONS: "get_conversations",
@@ -230,6 +248,17 @@ class SocketService {
       this.socket!.emit(SOCKET_EVENTS.GET_MESSAGES, data);
     } catch (error) {
       console.error("Failed to get messages:", error);
+      throw error;
+    }
+  }
+
+  // Mark messages as read
+  async markAsRead(conversationId: string): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.MARK_AS_READ, { conversationId });
+    } catch (error) {
+      console.error("Failed to mark as read:", error);
       throw error;
     }
   }
@@ -587,6 +616,21 @@ class SocketService {
     }
     this.socket.on(SOCKET_EVENTS.ERROR, callback);
     return () => this.socket?.off(SOCKET_EVENTS.ERROR, callback);
+  }
+
+  onMessagesRead(
+    callback: (data: {
+      conversationId: string;
+      userId: string;
+      readAt: string;
+    }) => void
+  ): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onMessagesRead listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.MESSAGES_READ, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.MESSAGES_READ, callback);
   }
 
   // Dissolve group

@@ -14,7 +14,8 @@ import {
   addOnlineUser,
   removeOnlineUser,
   clearChatData,
-  updateMessageReactions
+  updateMessageReactions,
+  markMessagesAsRead
 } from '@/store/slices/chatSlice';
 import socketService, { 
   SendMessageData, 
@@ -27,7 +28,7 @@ import socketService, {
 export const useSocket = () => {
   const dispatch = useDispatch();
   const { isConnected, conversations, activeConversationId } = useSelector((state: RootState) => state.chat);
-  const { token } = useSelector((state: RootState) => state.user);
+  const { token, user: currentUser } = useSelector((state: RootState) => state.user);
   const unsubscribeRefs = useRef<(() => void)[]>([]);
 
   // Connect to socket
@@ -48,6 +49,14 @@ export const useSocket = () => {
       unsubscribers.push(socketService.onReceiveMessage((message: SocketMessage) => {
         console.log("Received message via socket:", message);
         dispatch(addMessage(message));
+        
+        // If we're currently in this conversation and the message is not from us, mark as read
+        if (activeConversationId === message.conversation && 
+            message.sender._id !== currentUser?.id && 
+            !message.isRead) {
+          // Auto mark as read since user is currently viewing the conversation
+          markAsRead(message.conversation);
+        }
       }));
 
       unsubscribers.push(socketService.onMessagesResult((messages: SocketMessage[]) => {
@@ -95,6 +104,12 @@ export const useSocket = () => {
         dispatch(updateMessageReactions(data));
       }));
 
+      // Messages read events
+      unsubscribers.push(socketService.onMessagesRead((data) => {
+        console.log('Received MESSAGES_READ:', data);
+        dispatch(markMessagesAsRead(data));
+      }));
+
       // Group events
       unsubscribers.push(socketService.onGroupDissolved((data) => {
         console.log('Group dissolved:', data);
@@ -116,7 +131,7 @@ export const useSocket = () => {
     } finally {
       dispatch(setLoading(false));
     }
-  }, [token, isConnected, activeConversationId, dispatch]);
+  }, [token, isConnected, activeConversationId, currentUser, dispatch]);
 
   // Disconnect from socket
   const disconnect = useCallback(() => {
@@ -212,6 +227,16 @@ export const useSocket = () => {
     }
   }, [dispatch]);
 
+  // Mark messages as read
+  const markAsRead = useCallback(async (conversationId: string) => {
+    try {
+      await socketService.markAsRead(conversationId);
+    } catch (error) {
+      console.error('Failed to mark as read:', error);
+      dispatch(setError('Failed to mark as read'));
+    }
+  }, [dispatch]);
+
   // Auto connect when token is available
   useEffect(() => {
     if (token && !isConnected) {
@@ -244,5 +269,6 @@ export const useSocket = () => {
     startTyping,
     stopTyping,
     sendReaction,
+    markAsRead,
   };
 };

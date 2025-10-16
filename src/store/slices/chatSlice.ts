@@ -136,6 +136,20 @@ export const chatSlice = createSlice({
       }
     },
 
+    // Mark messages as read
+    markMessagesAsRead: (state, action: PayloadAction<{ conversationId: string; userId: string }>) => {
+      const { conversationId, userId } = action.payload;
+      const msgs = state.messages[conversationId];
+      if (msgs) {
+        // Mark all messages from other users as read
+        msgs.forEach(msg => {
+          if (msg.sender._id !== userId) {
+            msg.isRead = true;
+          }
+        });
+      }
+    },
+
     // Typing indicators
     addTypingUser: (state, action: PayloadAction<TypingUser>) => {
       const typingUser = action.payload;
@@ -194,6 +208,7 @@ export const {
   removeOnlineUser,
   clearChatData,
   updateMessageReactions,
+  markMessagesAsRead,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

@@ -73,6 +73,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     joinConversation,
     isConnected,
     sendReaction,
+    markAsRead,
   } = useSocket();
   const {
     messages,
@@ -144,6 +145,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           await joinConversation(conversation._id);
           await getMessages({ conversationId: conversation._id, limit: 50 });
 
+          // Mark messages as read when user joins conversation
+          await markAsRead(conversation._id);
+
           // Force scroll to bottom after loading messages
           setTimeout(() => {
             scrollToBottom();
@@ -162,6 +166,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     joinConversation,
     getMessages,
   ]);
+
+  // Auto mark messages as read when new messages arrive while user is in conversation
+  useEffect(() => {
+    if (activeConversationId && conversationMessages.length > 0) {
+      // Check if there are any unread messages from other users
+      const hasUnreadMessages = conversationMessages.some(
+        msg => msg.sender._id !== currentUser?.id && !msg.isRead
+      );
+      
+      if (hasUnreadMessages) {
+        // Auto mark as read since user is currently viewing the conversation
+        markAsRead(activeConversationId);
+      }
+    }
+  }, [conversationMessages, activeConversationId, currentUser?.id, markAsRead]);
 
   // Load messages when socket reconnects
   useEffect(() => {
@@ -850,8 +869,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                       <div className={styles.messageTime}>
                         {formatMessageTime(message.createdAt)}
-                        {isCurrentUser && message.isRead && (
-                          <CheckCircleOutlined className={styles.readIcon} />
+                        {isCurrentUser && (
+                          <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.8 }}>
+                            {message.isRead ? "Đã xem" : "Đã gửi"}
+                          </span>
                         )}
                       </div>
                       {/* Reaction display + placeholder icon */}

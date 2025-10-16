@@ -172,13 +172,17 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       return "Chưa có tin nhắn";
     }
 
-    const { content, sender, messageType } = conversation.lastMessage;
+    const { content, sender, type, messageType } = conversation.lastMessage;
+    if (!sender) {
+      return "Tin nhắn không xác định";
+    }
     const senderName =
-      sender.id === currentUser?.id
+      (sender._id || sender.id) === currentUser?.id
         ? "Bạn"
-        : sender.firstname || sender.username;
+        : sender.firstname || sender.username || "Người dùng";
 
-    switch (messageType) {
+    const messageTypeToUse = type || messageType;
+    switch (messageTypeToUse) {
       case "image":
         return `${senderName}: 📷 Hình ảnh`;
       case "file":
@@ -402,11 +406,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                           {(conversation.type === 'group' || conversation.isGroup) && (
                             <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
                               {conversation.participants.length} thành viên
-                              {conversation.groupAdmin?._id === currentUser?.id && (
-                                <Text style={{ marginLeft: 4, color: '#faad14' }}>
-                                  • Bạn là nhóm trưởng
-                                </Text>
-                              )}
+                              
                             </div>
                           )}
                         </div>

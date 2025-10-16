@@ -2,18 +2,23 @@ import axiosClient from "@/infrastructure/http/axiosClient";
 
 export interface Message {
   id: string;
+  _id?: string; // For MongoDB compatibility
   content: string;
   senderId: string;
   conversationId: string;
   messageType: "text" | "image" | "file" | "sticker";
+  type?: "text" | "image" | "video" | "file" | "emoji" | "sticker"; // Backend field
+  isRead?: boolean;
   createdAt: string;
   updatedAt: string;
   sender: {
     id: string;
+    _id?: string; // For MongoDB compatibility
     username: string;
     email: string;
     firstname: string;
     lastname: string;
+    avatarUrl?: string;
   };
   reactions?: MessageReaction[];
 }
