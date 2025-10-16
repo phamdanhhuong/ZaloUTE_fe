@@ -16,7 +16,7 @@ export default function Home() {
 
   useEffect(() => {
     // Only redirect after initialization is complete
-    if (!isInitialized && !isLoggedIn) {
+    if (isInitialized && !isLoggedIn) {
       router.push("/login");
     }
   }, [isLoggedIn, isInitialized, router]);
