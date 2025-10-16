@@ -256,6 +256,23 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
     }
   };
 
+  // Refs to avoid auto-triggering repeatedly
+  const autoAcceptedRef = useRef(false);
+
+  // Auto-accept when an incoming offer arrives
+  useEffect(() => {
+    if (incomingOffer && incomingFrom && !autoAcceptedRef.current) {
+      autoAcceptedRef.current = true;
+      // small delay to allow PeerConnection to be ready
+      setTimeout(() => {
+        handleAcceptIncoming().catch((e) => console.error('Auto-accept failed', e));
+      }, 200);
+    }
+    // reset flag if incomingOffer cleared
+    if (!incomingOffer) autoAcceptedRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingOffer, incomingFrom]);
+
   const handleDeclineIncoming = async () => {
     if (!incomingFrom) return;
     try {
@@ -276,7 +293,15 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
     setIsRingingOutgoing(false);
     setOutgoingTo(null);
     try {
+      // Notify peers via call hangup signaling
       await socketService.sendCallHangup(outgoingTo ?? undefined, room);
+      // Also send a chat message marking the call as ended so conversation UI won't auto-open call
+      const CALL_ENDED_PREFIX = '[CALL_ENDED]';
+      try {
+        await socketService.sendMessage({ conversationId: room, content: CALL_ENDED_PREFIX + JSON.stringify({ room }) });
+      } catch (e) {
+        // ignore message send failures
+      }
       await socketService.leaveCall(room);
     } catch (e) {
       console.error("Hangup failed", e);

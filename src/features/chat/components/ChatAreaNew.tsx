@@ -119,6 +119,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const CALL_INVITE_PREFIX = "[CALL_INVITE]";
   const CALL_ACCEPT_PREFIX = "[CALL_ACCEPT]";
   const CALL_REJECT_PREFIX = "[CALL_REJECT]";
+  const CALL_ENDED_PREFIX = "[CALL_ENDED]";
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,6 +199,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (content.startsWith(CALL_INVITE_PREFIX)) {
       try {
         const payload = JSON.parse(content.substring(CALL_INVITE_PREFIX.length));
+        const inviteRoom = payload?.room;
+        // Check if there is a later CALL_ENDED for the same invite room in this conversation
+        if (inviteRoom) {
+          const inviteIndex = conversationMessages.findIndex(m => m._id === msgId);
+          const endedIndex = conversationMessages.findIndex(m => {
+            try {
+              const c = m.content || "";
+              if (typeof c === 'string' && c.startsWith(CALL_ENDED_PREFIX)) {
+                const p = JSON.parse(c.substring(CALL_ENDED_PREFIX.length));
+                return p?.room === inviteRoom;
+              }
+            } catch (e) {
+              return false;
+            }
+            return false;
+          });
+          // if a CALL_ENDED exists after the invite, skip treating this invite as active
+          if (endedIndex !== -1 && endedIndex >= inviteIndex) {
+            lastProcessedCallMessageId.current = msgId;
+            return;
+          }
+        }
         if (senderId !== currentUser?.id) {
           setIncomingCall({ room: payload.room, fromId: senderId, messageId: msgId });
           lastProcessedCallMessageId.current = msgId;
@@ -226,6 +249,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         }
       } catch (e) {
         console.warn('Malformed call reject payload', e);
+      }
+    } else if (content.startsWith(CALL_ENDED_PREFIX)) {
+      // If the last message marks the call as ended, clear any incoming/outgoing call UI
+      try {
+        // If the ended message refers to a room, and it matches current incoming/outgoing, clear state
+        const payload = JSON.parse(content.substring(CALL_ENDED_PREFIX.length));
+        const endedRoom = payload?.room;
+        if (endedRoom) {
+          if (incomingCall && incomingCall.room === endedRoom) setIncomingCall(null);
+          if (outgoingCall && outgoingCall.room === endedRoom) setOutgoingCall(null);
+          lastProcessedCallMessageId.current = msgId;
+        }
+      } catch (e) {
+        // ignore
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
