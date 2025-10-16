@@ -13,6 +13,10 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
   const [peers, setPeers] = useState<string[]>([]);
   const peersRef = useRef<Set<string>>(new Set());
   const [joined, setJoined] = useState(false);
+  const [incomingOffer, setIncomingOffer] = useState<RTCSessionDescriptionInit | null>(null);
+  const [incomingFrom, setIncomingFrom] = useState<string | null>(null);
+  const [outgoingTo, setOutgoingTo] = useState<string | null>(null);
+  const [isRingingOutgoing, setIsRingingOutgoing] = useState(false);
 
   useEffect(() => {
     let unsubOffer: (() => void) | null = null;
@@ -54,23 +58,22 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
     setupMediaAndPeer();
 
     // socket listeners
-    unsubOffer = socketService.onCallOffer(async (data) => {
+    unsubOffer = socketService.onCallOffer((data) => {
       console.log("Received offer", data);
-      // add the offerer to peers
+      // add the offerer to peers list
       if (!peersRef.current.has(data.from)) {
         peersRef.current.add(data.from);
         setPeers(Array.from(peersRef.current));
       }
-      if (pcRef.current) {
-        await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pcRef.current.createAnswer();
-        await pcRef.current.setLocalDescription(answer);
-        socketService.sendCallAnswer(data.from, answer).catch(console.error);
-      }
+      // set incoming offer state and wait for user to accept/decline
+      setIncomingOffer(data.offer);
+      setIncomingFrom(data.from);
     });
 
     unsubAnswer = socketService.onCallAnswer(async (data) => {
       console.log("Received answer", data);
+      // remote accepted our offer
+      setIsRingingOutgoing(false);
       if (pcRef.current) {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
       }
@@ -130,9 +133,42 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
     }
     // pick the first peer as target
     const target = peers[0];
+    setOutgoingTo(target);
+    setIsRingingOutgoing(true);
     const offer = await pcRef.current.createOffer();
     await pcRef.current.setLocalDescription(offer);
     await socketService.sendCallOffer(target, offer);
+  };
+
+  const handleAcceptIncoming = async () => {
+    if (!incomingOffer || !incomingFrom) return;
+    if (!pcRef.current) {
+      console.error('PeerConnection not ready');
+      return;
+    }
+    try {
+      await pcRef.current.setRemoteDescription(new RTCSessionDescription(incomingOffer));
+      const answer = await pcRef.current.createAnswer();
+      await pcRef.current.setLocalDescription(answer);
+      await socketService.sendCallAnswer(incomingFrom, answer);
+    } catch (e) {
+      console.error('Accept incoming failed', e);
+    } finally {
+      setIncomingOffer(null);
+      setIncomingFrom(null);
+    }
+  };
+
+  const handleDeclineIncoming = async () => {
+    if (!incomingFrom) return;
+    try {
+      await socketService.sendCallHangup(incomingFrom, room);
+    } catch (e) {
+      console.error('Decline send hangup failed', e);
+    } finally {
+      setIncomingOffer(null);
+      setIncomingFrom(null);
+    }
   };
 
   const handleHangup = async () => {
@@ -140,6 +176,9 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
       pcRef.current.close();
       pcRef.current = null;
     }
+    setIsRingingOutgoing(false);
+    setOutgoingTo(null);
+    await socketService.sendCallHangup(outgoingTo ?? undefined, room);
     await socketService.leaveCall(room);
   };
 
@@ -162,6 +201,22 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
         <div>{joined ? 'Joined call room' : 'Joining...'}</div>
         <div>Peers: {peers.length ? peers.join(', ') : 'none'}</div>
       </div>
+      {/* Incoming call modal */}
+      {incomingFrom && (
+        <div style={{ position: 'fixed', left: 20, bottom: 20, padding: 12, background: '#fff', border: '1px solid #ccc' }}>
+          <div>Incoming call from {incomingFrom}</div>
+          <button onClick={handleAcceptIncoming}>Accept</button>
+          <button onClick={handleDeclineIncoming}>Decline</button>
+        </div>
+      )}
+
+      {/* Outgoing ringing indicator */}
+      {isRingingOutgoing && (
+        <div style={{ position: 'fixed', right: 20, bottom: 20, padding: 12, background: '#fff', border: '1px solid #ccc' }}>
+          <div>Ringing {outgoingTo}</div>
+          <button onClick={handleHangup}>Cancel</button>
+        </div>
+      )}
     </div>
   );
 }

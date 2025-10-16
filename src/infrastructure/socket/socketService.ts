@@ -730,6 +730,16 @@ class SocketService {
     }
   }
 
+  async sendCallHangup(target?: string, room?: string): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.CALL_HANGUP, { target, room });
+    } catch (error) {
+      console.error('Failed to send call hangup:', error);
+      throw error;
+    }
+  }
+
   onCallOffer(callback: (data: { from: string; offer: RTCSessionDescriptionInit }) => void): () => void {
     const evt = SOCKET_EVENTS.CALL_OFFER;
     if (!this.socket) {
