@@ -1,4 +1,4 @@
-import io, { Socket } from "socket.io-client";
+import io from "socket.io-client";
 export interface SocketMessage {
   _id: string;
   conversation: string;
@@ -152,11 +152,21 @@ export const SOCKET_EVENTS = {
   // Error events
   ERROR: "socket_error",
   CONNECTION_SUCCESS: "connection_success",
+  // Call / WebRTC signaling events
+  CALL_JOIN: 'call_join',
+  CALL_USER_JOINED: 'call_user_joined',
+  CALL_OFFER: 'call_offer',
+  CALL_ANSWER: 'call_answer',
+  CALL_ICE_CANDIDATE: 'call_ice_candidate',
+  CALL_USER_LEFT: 'call_user_left',
+  CALL_HANGUP: 'call_hangup',
 } as const;
 
 class SocketService {
   private socket: ReturnType<typeof io> | null = null;
   private token: string | null = null;
+  // pending listeners to attach once socket is created
+  private pendingListeners: Map<string, Function[]> = new Map();
 
   // Initialize socket connection
   connect(token: string): Promise<void> {
@@ -175,6 +185,11 @@ class SocketService {
 
       this.socket.on("connect", () => {
         console.log("Socket connected:", this.socket?.id);
+        // flush pending listeners
+        this.pendingListeners.forEach((cbs, evt) => {
+          cbs.forEach((cb) => this.socket?.on(evt, cb as any));
+        });
+        this.pendingListeners.clear();
         resolve();
       });
 
@@ -662,6 +677,133 @@ class SocketService {
     }
     this.socket.on(SOCKET_EVENTS.GROUP_DISSOLVED, callback);
     return () => this.socket?.off(SOCKET_EVENTS.GROUP_DISSOLVED, callback);
+  }
+
+  // --- Call / WebRTC signaling methods ---
+  async joinCall(room: string): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.CALL_JOIN, { room });
+    } catch (error) {
+      console.error('Failed to join call room:', error);
+      throw error;
+    }
+  }
+
+  async leaveCall(room: string): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.CALL_HANGUP, { room });
+    } catch (error) {
+      console.error('Failed to leave call room:', error);
+      throw error;
+    }
+  }
+
+  async sendCallOffer(target: string, offer: RTCSessionDescriptionInit): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.CALL_OFFER, { target, offer });
+    } catch (error) {
+      console.error('Failed to send call offer:', error);
+      throw error;
+    }
+  }
+
+  async sendCallAnswer(target: string, answer: RTCSessionDescriptionInit): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.CALL_ANSWER, { target, answer });
+    } catch (error) {
+      console.error('Failed to send call answer:', error);
+      throw error;
+    }
+  }
+
+  async sendCallIceCandidate(target: string, candidate: RTCIceCandidateInit): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.CALL_ICE_CANDIDATE, { target, candidate });
+    } catch (error) {
+      console.error('Failed to send ICE candidate:', error);
+      throw error;
+    }
+  }
+
+  onCallOffer(callback: (data: { from: string; offer: RTCSessionDescriptionInit }) => void): () => void {
+    const evt = SOCKET_EVENTS.CALL_OFFER;
+    if (!this.socket) {
+      const arr = this.pendingListeners.get(evt) ?? [];
+      arr.push(callback);
+      this.pendingListeners.set(evt, arr);
+      return () => {
+        // remove from pending if still there
+        const cur = this.pendingListeners.get(evt) ?? [];
+        this.pendingListeners.set(evt, cur.filter((c) => c !== callback));
+      };
+    }
+    this.socket.on(evt, callback);
+    return () => this.socket?.off(evt, callback);
+  }
+
+  onCallAnswer(callback: (data: { from: string; answer: RTCSessionDescriptionInit }) => void): () => void {
+    const evt = SOCKET_EVENTS.CALL_ANSWER;
+    if (!this.socket) {
+      const arr = this.pendingListeners.get(evt) ?? [];
+      arr.push(callback);
+      this.pendingListeners.set(evt, arr);
+      return () => {
+        const cur = this.pendingListeners.get(evt) ?? [];
+        this.pendingListeners.set(evt, cur.filter((c) => c !== callback));
+      };
+    }
+    this.socket.on(evt, callback);
+    return () => this.socket?.off(evt, callback);
+  }
+
+  onCallIceCandidate(callback: (data: { from: string; candidate: RTCIceCandidateInit }) => void): () => void {
+    const evt = SOCKET_EVENTS.CALL_ICE_CANDIDATE;
+    if (!this.socket) {
+      const arr = this.pendingListeners.get(evt) ?? [];
+      arr.push(callback);
+      this.pendingListeners.set(evt, arr);
+      return () => {
+        const cur = this.pendingListeners.get(evt) ?? [];
+        this.pendingListeners.set(evt, cur.filter((c) => c !== callback));
+      };
+    }
+    this.socket.on(evt, callback);
+    return () => this.socket?.off(evt, callback);
+  }
+
+  onCallUserJoined(callback: (data: { socketId: string }) => void): () => void {
+    const evt = SOCKET_EVENTS.CALL_USER_JOINED;
+    if (!this.socket) {
+      const arr = this.pendingListeners.get(evt) ?? [];
+      arr.push(callback);
+      this.pendingListeners.set(evt, arr);
+      return () => {
+        const cur = this.pendingListeners.get(evt) ?? [];
+        this.pendingListeners.set(evt, cur.filter((c) => c !== callback));
+      };
+    }
+    this.socket.on(evt, callback);
+    return () => this.socket?.off(evt, callback);
+  }
+
+  onCallUserLeft(callback: (data: { socketId: string }) => void): () => void {
+    const evt = SOCKET_EVENTS.CALL_USER_LEFT;
+    if (!this.socket) {
+      const arr = this.pendingListeners.get(evt) ?? [];
+      arr.push(callback);
+      this.pendingListeners.set(evt, arr);
+      return () => {
+        const cur = this.pendingListeners.get(evt) ?? [];
+        this.pendingListeners.set(evt, cur.filter((c) => c !== callback));
+      };
+    }
+    this.socket.on(evt, callback);
+    return () => this.socket?.off(evt, callback);
   }
 }
 
