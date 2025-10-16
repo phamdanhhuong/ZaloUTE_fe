@@ -531,6 +531,15 @@ class SocketService {
     return () => this.socket?.off(SOCKET_EVENTS.USER_OFFLINE, callback);
   }
 
+  onIncomingCall(callback: (data: { conversationId: string; message: SocketMessage }) => void): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onIncomingCall listener");
+      return () => {};
+    }
+    this.socket.on((SOCKET_EVENTS as any).INCOMING_CALL || 'incoming_call', callback);
+    return () => this.socket?.off((SOCKET_EVENTS as any).INCOMING_CALL || 'incoming_call', callback);
+  }
+
   onTypingStart(
     callback: (data: { userId: string; conversationId: string }) => void
   ): () => void {
