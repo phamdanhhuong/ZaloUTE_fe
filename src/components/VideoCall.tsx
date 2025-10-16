@@ -323,40 +323,39 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
     if (deviceId === selectedVideoDeviceId) return;
     setSelectedVideoDeviceId(deviceId);
   };
-
   const retryGetMedia = async () => {
     setMediaError(null);
     try {
-      // re-run setup; use currently selected device
-      await (async () => {
-        const deviceId = selectedVideoDeviceId ?? undefined;
-        const constraints: MediaStreamConstraints = {
-          video: deviceId ? { deviceId: { exact: deviceId } } : true,
-          audio: true,
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        // stop previous
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach((t) => t.stop());
-        }
-        localStreamRef.current = stream;
-        if (localRef.current) localRef.current.srcObject = stream;
-        // attach tracks to existing peer connection
-        const pc = pcRef.current;
-        if (pc) {
-          // replace or add tracks
-          const senders = pc.getSenders();
-          stream.getTracks().forEach((t) => {
-            const sender = senders.find((s) => s.track && s.track.kind === t.kind);
-            if (sender) {
-              // @ts-ignore - replaceTrack exists on RTCRtpSender
-              try { sender.replaceTrack(t); } catch (e) { console.warn('replaceTrack failed', e); }
-            } else {
-              pc.addTrack(t, stream);
+      const deviceId = selectedVideoDeviceId ?? undefined;
+      const constraints: MediaStreamConstraints = {
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: true,
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // stop previous
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      localStreamRef.current = stream;
+      if (localRef.current) localRef.current.srcObject = stream;
+      // attach tracks to existing peer connection
+      const pc = pcRef.current;
+      if (pc) {
+        const senders = pc.getSenders();
+        stream.getTracks().forEach((t) => {
+          const sender = senders.find((s) => s.track && s.track.kind === t.kind);
+          if (sender) {
+            try {
+              // @ts-ignore
+              sender.replaceTrack(t);
+            } catch (e) {
+              console.warn('replaceTrack failed', e);
             }
-          });
-        }
-      })();
+          } else {
+            pc.addTrack(t, stream);
+          }
+        });
+      }
     } catch (err: any) {
       console.error('Retry getUserMedia failed', err);
       if (err && err.name === 'NotAllowedError') {
@@ -369,35 +368,69 @@ export default function VideoCall({ room = "global-call-room" }: Props) {
     }
   };
 
+  const styles: { [k: string]: React.CSSProperties } = {
+    container: { display: 'flex', flexDirection: 'column', height: '100%', gap: 12, padding: 12 },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    title: { margin: 0, fontSize: 18 },
+    participants: { fontSize: 13, color: '#666' },
+    stage: { display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, width: '100%', maxWidth: 980 },
+    videoCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#111', padding: 8, borderRadius: 8 },
+    videoLabel: { color: '#fff', fontSize: 12, marginBottom: 8 },
+  // Use a fixed height so the <video> element shows the stream reliably
+  videoEl: { width: '100%', height: 240, background: '#000', borderRadius: 6, objectFit: 'cover' as const },
+    controls: { display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+    controlBtn: { padding: '8px 12px', borderRadius: 6, border: 'none', cursor: 'pointer' },
+    hangupFloat: { position: 'fixed', right: 24, bottom: 24, width: 64, height: 64, borderRadius: 32, background: '#e53935', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, boxShadow: '0 6px 18px rgba(0,0,0,0.25)', border: 'none', cursor: 'pointer' }
+  };
+
   return (
-    <div>
-      <h3>Video Call (room: {room})</h3>
-      <div style={{ display: "flex", gap: 12 }}>
-        <div>
-          <div>Local</div>
-          <video ref={localRef} autoPlay muted playsInline style={{ width: 320, height: 240, background: "#000" }} />
-        </div>
-        <div>
-          <div>Remote</div>
-          <video ref={remoteRef} autoPlay playsInline style={{ width: 320, height: 240, background: "#000" }} />
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h3 style={styles.title}>Cuộc gọi — {room}</h3>
+        <div style={styles.participants}>Thành viên: {peers.length ? peers.join(', ') : 'Chỉ bạn'}</div>
+      </div>
+
+      <div style={styles.stage}>
+        <div style={styles.grid}>
+          <div style={styles.videoCard}>
+            <div style={styles.videoLabel}>Bạn (Local)</div>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <video ref={localRef} autoPlay muted playsInline style={styles.videoEl} />
+              {/* Overlay when no local video track available */}
+              {(!localStreamRef.current || (localStreamRef.current.getVideoTracks().length === 0)) && (
+                <div style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: 'rgba(0,0,0,0.4)', borderRadius: 6 }}>
+                  <div style={{ textAlign: 'center' }}>Không có video địa phương<br/><small style={{ color: '#ddd' }}>Kiểm tra quyền máy ảnh hoặc chọn thiết bị</small></div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={styles.videoCard}>
+            <div style={styles.videoLabel}>Người khác (Remote)</div>
+            <video ref={remoteRef} autoPlay playsInline style={styles.videoEl} />
+          </div>
         </div>
       </div>
-      <div style={{ marginTop: 12 }}>
-        <button onClick={handleCall} disabled={peers.length === 0}>Call</button>
-        <button onClick={handleHangup}>Hangup</button>
-        <button onClick={toggleMute}>{isMicMuted ? "Unmute" : "Mute"}</button>
-        <label style={{ marginLeft: 8 }}>
-          Camera:
-          <select value={selectedVideoDeviceId ?? ""} onChange={(e) => handleVideoDeviceChange(e.target.value)} style={{ marginLeft: 8 }}>
+
+      <div style={styles.controls}>
+        <button onClick={handleCall} disabled={peers.length === 0} style={{ ...styles.controlBtn, background: peers.length === 0 ? '#ccc' : '#1976d2', color: '#fff' }}>Call</button>
+        <button onClick={toggleMute} style={{ ...styles.controlBtn, background: '#f5f5f5' }}>{isMicMuted ? 'Unmute' : 'Mute'}</button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, color: '#444' }}>Camera:</span>
+          <select value={selectedVideoDeviceId ?? ""} onChange={(e) => handleVideoDeviceChange(e.target.value)}>
             {videoDevices.length === 0 && <option value="">Default</option>}
             {videoDevices.map((d) => (
               <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId}</option>
             ))}
           </select>
         </label>
-        <div>{joined ? "Joined call room" : "Joining..."}</div>
-        <div>Peers: {peers.length ? peers.join(", ") : "none"}</div>
       </div>
+
+      <div style={{ fontSize: 13, color: '#666', marginTop: 8 }}>
+        {joined ? "Đã vào phòng" : "Đang kết nối..."} • Thành viên: {peers.length ? peers.join(', ') : 'none'}
+      </div>
+
+      <button title="Thoát cuộc gọi" onClick={handleHangup} style={styles.hangupFloat}>⏻</button>
 
       {/* Media error UI */}
       {mediaError && (
