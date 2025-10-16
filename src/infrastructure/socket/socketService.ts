@@ -167,24 +167,149 @@ class SocketService {
   private token: string | null = null;
   // pending listeners to attach once socket is created
   private pendingListeners: Map<string, Function[]> = new Map();
+  // track whether we've already attempted a polling fallback for this connect call
+  private triedPolling = false;
+  // remember last computed origin and path so fallback keeps same namespace
+  private lastSocketOrigin: string | null = null;
+  private lastSocketPath: string | null = null;
+
+  // helper to attach common listeners to a socket instance and wire resolve/reject
+  private setupSocketListeners(
+    socketInstance: ReturnType<typeof io>,
+    resolve: () => void,
+    reject: (err: any) => void
+  ) {
+    socketInstance.on("connect", () => {
+      // socket connected
+      // flush pending listeners
+      this.pendingListeners.forEach((cbs, evt) => {
+        cbs.forEach((cb) => socketInstance.on(evt, cb as any));
+      });
+      this.pendingListeners.clear();
+      resolve();
+    });
+
+    socketInstance.on("connect_error", (error: any) => {
+      try {
+        console.error("Socket connection error:", error && (error.message || error));
+        if ((error as any).data) console.error("Socket connect_error data:", (error as any).data);
+      } catch (e) {
+        console.error("Socket connect_error (unable to stringify):", error);
+      }
+
+      // extra debug: manager uri/options/engine state to help diagnose handshake
+      try {
+        const manager = (socketInstance as any).io;
+        console.log('connect_error context:', {
+          managerUri: manager?.uri,
+          opts: manager?.opts,
+          // engine might be undefined at this point, but log name if present
+          engineTransport: manager?.engine?.transport?.name || manager?.engine?.transport?.name === '' ? manager?.engine?.transport?.name : undefined,
+        });
+      } catch (e) {
+        // ignore debug failures
+      }
+
+      // If upgrade to websocket failed, try polling once as a fallback (server may block websockets)
+      if (!this.triedPolling) {
+        console.warn("Attempting polling fallback for socket (websocket upgrade failed)");
+        this.triedPolling = true;
+        try {
+          socketInstance.disconnect();
+        } catch (e) {}
+
+        // create a new socket instance forcing polling transport
+        const fallbackOrigin = this.lastSocketOrigin || (process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:8080");
+        const fallbackPath = this.lastSocketPath || (process.env.NEXT_PUBLIC_SOCKET_PATH || "/socket.io");
+        this.socket = io(fallbackOrigin, {
+          path: fallbackPath,
+          auth: { token: this.token },
+          query: { token: this.token || "" },
+          transports: ["polling"],
+          timeout: 20000,
+          forceNew: true,
+        });
+
+        // attach listeners to the new instance (resolve/reject the original promise accordingly)
+        this.setupSocketListeners(this.socket, resolve, reject);
+        return;
+      }
+
+      reject(error);
+    });
+
+    socketInstance.on("disconnect", (reason: any) => {
+      console.warn("Socket disconnected:", reason);
+    });
+  }
 
   // Initialize socket connection
   connect(token: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this.token = token;
 
-      this.socket = io(
-        process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:8080/chat",
-        {
+      const configuredSocketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:8080";
+      const configuredSocketPath = process.env.NEXT_PUBLIC_SOCKET_PATH || "/socket.io";
+
+      // If NEXT_PUBLIC_SOCKET_URL includes a pathname (e.g. /chat), parse and combine
+      // so we connect to origin with path '/chat/socket.io' instead of to '/socket.io' at root.
+      try {
+        const parsed = new URL(configuredSocketUrl);
+        const origin = parsed.origin; // e.g. http://localhost:8080
+        const urlBasePath = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname.replace(/\/$/, "") : ""; // '/chat' or ''
+        // Use baseUrl including pathname as the socket endpoint (so namespace is part of the URL),
+        // and use the engine.io/socket.io path separately (usually '/socket.io').
+        const baseUrl = `${origin}${urlBasePath}`; // e.g. http://localhost:8080/chat or http://localhost:8080
+        const engineIoPath = configuredSocketPath; // usually '/socket.io'
+
+        this.lastSocketOrigin = baseUrl;
+        this.lastSocketPath = engineIoPath;
+
+        console.log("Socket connecting to:", { socketUrl: configuredSocketUrl, baseUrl, engineIoPath, authTokenPresent: !!token });
+
+        this.socket = io(baseUrl, {
+          // path should be the engine.io/socket.io path (not include the namespace segment)
+          path: engineIoPath,
+          // Send token both in auth and query to support various server-side handshake implementations
+          auth: { token },
           query: { token },
           transports: ["websocket", "polling"],
           timeout: 20000,
           forceNew: true,
-        }
-      );
+        });
+      } catch (e) {
+        // on any parse failure fall back to raw values
+        const socketUrl = configuredSocketUrl;
+        const socketPath = configuredSocketPath;
+        // fallback: preserve the raw configured values
+        this.lastSocketOrigin = socketUrl;
+        this.lastSocketPath = socketPath;
+        console.log("Socket connecting to (fallback):", { socketUrl, socketPath, authTokenPresent: !!token });
+        this.socket = io(socketUrl, {
+          path: socketPath,
+          auth: { token },
+          query: { token },
+          transports: ["websocket", "polling"],
+          timeout: 20000,
+          forceNew: true,
+        });
+      }
+
+      // immediate debug: show manager uri/opts so browser console shows exact request target
+      try {
+        const manager = (this.socket as any).io;
+        console.log('Socket created (manager context):', {
+          managerUri: manager?.uri,
+          opts: manager?.opts,
+          socketOrigin: this.lastSocketOrigin,
+          socketPath: this.lastSocketPath,
+        });
+      } catch (e) {
+        // ignore
+      }
 
       this.socket.on("connect", () => {
-        console.log("Socket connected:", this.socket?.id);
+        // socket connected
         // flush pending listeners
         this.pendingListeners.forEach((cbs, evt) => {
           cbs.forEach((cb) => this.socket?.on(evt, cb as any));
@@ -194,12 +319,24 @@ class SocketService {
       });
 
       this.socket.on("connect_error", (error: any) => {
-        console.error("Socket connection error:", error);
+        // Provide expanded info to help debugging handshake failures (CORS, auth, namespace mismatch)
+        try {
+          console.error("Socket connection error:", error && (error.message || error));
+          if ((error as any).data) {
+            console.error("Socket connect_error data:", (error as any).data);
+          }
+        } catch (e) {
+          console.error("Socket connect_error (unable to stringify):", error);
+        }
         reject(error);
       });
 
-      this.socket.on(SOCKET_EVENTS.CONNECTION_SUCCESS, (data: any) => {
-        console.log("Connection successful:", data);
+      this.socket.on("disconnect", (reason: any) => {
+        console.warn("Socket disconnected:", reason);
+      });
+
+      this.socket.on(SOCKET_EVENTS.CONNECTION_SUCCESS, (_data: any) => {
+        // connection successful
       });
 
       this.socket.on(SOCKET_EVENTS.ERROR, (error: any) => {
@@ -210,11 +347,11 @@ class SocketService {
 
   // Disconnect socket
   disconnect(): void {
-    if (this.socket) {
+      if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
       this.token = null;
-      console.log("Socket disconnected");
+      // socket disconnected
     }
   }
 
@@ -316,7 +453,7 @@ class SocketService {
     try {
       await this.waitForConnection();
       this.socket!.emit(SOCKET_EVENTS.ADD_REACTION, data);
-      console.log("[DEBUG] Sent ADD_REACTION:", data);
+  // debug: sent add reaction
     } catch (error) {
       console.error("Failed to send reaction:", error);
       throw error;
@@ -820,3 +957,13 @@ class SocketService {
 // Export singleton instance
 export const socketService = new SocketService();
 export default socketService;
+
+// Dev helper: expose socketService on window for quick inspection in browser devtools
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  try {
+    (window as any).__socketService = socketService;
+    console.log("Dev: socketService attached to window.__socketService");
+  } catch (e) {
+    // ignore in case strict CSP or other issues
+  }
+}

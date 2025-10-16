@@ -138,13 +138,13 @@ export interface GetMessagesResponse {
 // Lấy danh sách cuộc trò chuyện
 export const getConversations = async (): Promise<Conversation[]> => {
   try {
-    const response = await axiosClient.get("/conversation/list");
-    console.log("Get conversations response:", response);
+  const response = await axiosClient.get("/conversation/list");
+  // getConversations response (logs removed)
 
     // The axios interceptor extracts data from wrapped responses,
     // so response is the data directly (not response.data)
     if (Array.isArray(response)) {
-      console.log("Parsed conversations data:", response);
+      // parsed conversations data
       return response as Conversation[];
     } else {
       console.error(
@@ -165,13 +165,13 @@ export const createConversation = async (
   payload: CreateConversationRequest
 ): Promise<Conversation> => {
   try {
-    const response = await axiosClient.post("/conversation", payload);
-    console.log("Create conversation response:", response);
+  const response = await axiosClient.post("/conversation", payload);
+  // create conversation response (logs removed)
 
     let data;
     if (response && typeof response === "object") {
       if ("data" in response && response.data) {
-        console.log("Response data:", response.data);
+  // response data available
         data = response.data.data || response.data;
       } else {
         data = response;
@@ -180,7 +180,7 @@ export const createConversation = async (
       throw new Error("Invalid response format");
     }
 
-    console.log("Parsed conversation data:", data);
+  // parsed conversation data
 
     if (!data) {
       throw new Error("No data received from server");
@@ -198,14 +198,14 @@ export const getMessages = async (
   params: GetMessagesRequest
 ): Promise<GetMessagesResponse> => {
   try {
-    console.log("Calling getMessages API with params:", params);
+  // calling getMessages API
     const response = await axiosClient.get(
       `/conversation/${params.conversationId}/messages`,
       {
         params: { limit: params.limit, offset: params.offset },
       }
     );
-    console.log("getMessages API response:", response);
+    // getMessages API response
     return response as unknown as GetMessagesResponse;
   } catch (error) {
     console.error("Get messages failed:", error);
@@ -311,7 +311,6 @@ export const createGroup = async (
 ): Promise<Conversation> => {
   try {
     const response = await axiosClient.post("/conversation/group", payload);
-    console.log("Create group response:", response);
 
     let data;
     if (response && typeof response === "object") {

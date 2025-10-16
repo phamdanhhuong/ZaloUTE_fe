@@ -66,13 +66,12 @@ export const ZaloLayout: React.FC = () => {
   // Connect to socket when component mounts
   useEffect(() => {
     if (currentUser && !isConnected) {
-      console.log("Initializing socket connection for user:", currentUser.id);
-      console.log("Token available:", !!token);
+      // Initialize socket connection when token is available
       if (token) {
         connect();
       }
     }
-    
+
     // Cleanup on unmount
     return () => {
       if (isConnected) {
@@ -84,7 +83,7 @@ export const ZaloLayout: React.FC = () => {
   // Auto-join conversation when socket connects
   useEffect(() => {
     if (isConnected && selectedConversation?._id) {
-      console.log("Socket connected, joining conversation:", selectedConversation._id);
+      // Join selected conversation when socket connects
       joinConversation(selectedConversation._id);
     }
   }, [isConnected, selectedConversation?._id, joinConversation]);
@@ -133,14 +132,14 @@ export const ZaloLayout: React.FC = () => {
     }
 
     try {
-      console.log("Creating conversation with friend:", friend);
+      // Creating conversation with friend
       // Create or get existing conversation with this friend
       const conversation = await createConversation({
         participantIds: [friend.id], // Only send friend ID, current user will be added automatically
         isGroup: false
       });
       
-      console.log("Received conversation:", conversation);
+  // Received conversation from server
       
       // Convert to SocketConversation format
       const socketConversation: SocketConversation = {
@@ -152,7 +151,7 @@ export const ZaloLayout: React.FC = () => {
         updatedAt: conversation.updatedAt,
       };
       
-      console.log("Created socketConversation with ID:", socketConversation._id);
+  // Created socketConversation with ID
       setSelectedConversation(socketConversation);
       setActiveView("chat");
       
@@ -187,7 +186,7 @@ export const ZaloLayout: React.FC = () => {
   const groups = conversations
     .filter(conv => conv.type === 'group' || conv.isGroup)
     .map(conv => {
-      console.log('Conversation for group:', conv); // Debug log
+      // convert conversation to group entry
       return {
         id: conv._id || conv.id || '',
         name: conv.name || conv.groupName || `Nhóm ${conv.participants?.length || 0} thành viên`,
@@ -240,7 +239,6 @@ export const ZaloLayout: React.FC = () => {
 
     switch (activeView) {
       case "chat":
-        console.log('Rendering ChatAreaNew with selectedConversation:', selectedConversation);
         return <ChatAreaNew conversation={selectedConversation} />;
       case "friends":
         return renderFriendTabContent();
@@ -271,17 +269,15 @@ export const ZaloLayout: React.FC = () => {
       case "friend-requests":
         return (
           <FriendRequests
-            onAcceptRequest={(requestId) => {
-              console.log("Accepted friend request:", requestId);
-              // Refresh friend requests and friends list
-              loadPendingRequests();
-            }}
-            onRejectRequest={(requestId) => {
-              console.log("Rejected friend request:", requestId);
-              // Refresh friend requests
-              loadPendingRequests();
-            }}
-          />
+                onAcceptRequest={(requestId) => {
+                  // Accepted friend request
+                  loadPendingRequests();
+                }}
+                onRejectRequest={(requestId) => {
+                  // Rejected friend request
+                  loadPendingRequests();
+                }}
+              />
         );
       case "group-invites":
         return (
@@ -333,10 +329,7 @@ export const ZaloLayout: React.FC = () => {
 
   // Convert regular conversation to socket conversation format
   const handleConversationSelect = (conversation: Conversation) => {
-    console.log('Conversation selected:', conversation);
-    console.log('Conversation._id:', conversation._id);
-    console.log('Conversation.id:', conversation.id);
-    console.log('Conversation participants:', conversation.participants);
+  // Conversation selected, preparing socketConversation
     
     const socketConversation: SocketConversation = {
       _id: conversation._id || conversation.id || '', // Handle both _id and id with fallback
@@ -347,15 +340,10 @@ export const ZaloLayout: React.FC = () => {
       updatedAt: conversation.updatedAt,
     };
     
-    console.log('Created socketConversation:', socketConversation);
-    console.log('socketConversation._id:', socketConversation._id);
     setSelectedConversation(socketConversation);
     
     // Join conversation room only if socket is connected
-    console.log('Socket connection state - isConnected:', isConnected);
-    console.log('Socket conversation ID exists:', !!socketConversation._id);
     if (socketConversation._id && isConnected) {
-      console.log('Attempting to join conversation:', socketConversation._id);
       joinConversation(socketConversation._id);
     } else if (!isConnected) {
       console.warn("Socket not connected, conversation will be joined when connected");

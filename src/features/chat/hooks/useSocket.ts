@@ -47,7 +47,6 @@ export const useSocket = () => {
 
       // Message events
       unsubscribers.push(socketService.onReceiveMessage((message: SocketMessage) => {
-        console.log("Received message via socket:", message);
         dispatch(addMessage(message));
         
         // If we're currently in this conversation and the message is not from us, mark as read
@@ -60,7 +59,6 @@ export const useSocket = () => {
       }));
 
       unsubscribers.push(socketService.onMessagesResult((messages: SocketMessage[]) => {
-        console.log("Received messages result:", messages.length, "messages");
         if (activeConversationId) {
           dispatch(setMessages({ conversationId: activeConversationId, messages }));
         }
@@ -82,12 +80,10 @@ export const useSocket = () => {
 
       // Typing events
       unsubscribers.push(socketService.onTypingStart((data) => {
-        console.log("Received typing start:", data);
         dispatch(addTypingUser({ userId: data.userId, conversationId: data.conversationId }));
       }));
 
       unsubscribers.push(socketService.onTypingStop((data) => {
-        console.log("Received typing stop:", data);
         dispatch(removeTypingUser({ userId: data.userId, conversationId: data.conversationId }));
       }));
 
@@ -100,23 +96,18 @@ export const useSocket = () => {
 
       // Reaction events
       unsubscribers.push(socketService.onMessageReactionUpdated((data) => {
-        console.log('Received MESSAGE_REACTION_UPDATED:', data);
         dispatch(updateMessageReactions(data));
       }));
 
       // Messages read events
       unsubscribers.push(socketService.onMessagesRead((data) => {
-        console.log('Received MESSAGES_READ:', data);
         dispatch(markMessagesAsRead(data));
       }));
 
       // Group events
       unsubscribers.push(socketService.onGroupDissolved((data) => {
-        console.log('Group dissolved:', data);
         // Remove the dissolved group from conversations
         dispatch(removeConversation({ conversationId: data.conversationId }));
-        // Show notification
-        console.log(`Group dissolved: ${data.message}`);
       }));
 
       unsubscribeRefs.current = unsubscribers;
@@ -147,9 +138,7 @@ export const useSocket = () => {
   // Send message
   const sendMessage = useCallback(async (data: SendMessageData) => {
     try {
-      console.log("Attempting to send message:", data);
-      await socketService.sendMessage(data);
-      console.log("Message sent via socket");
+  await socketService.sendMessage(data);
     } catch (error) {
       console.error('Failed to send message:', error);
       dispatch(setError('Failed to send message'));
@@ -169,8 +158,7 @@ export const useSocket = () => {
   // Join conversation
   const joinConversation = useCallback(async (conversationId: string) => {
     try {
-      console.log('Joining socket room:', conversationId);
-      await socketService.joinConversation(conversationId);
+  await socketService.joinConversation(conversationId);
     } catch (error) {
       console.error('Failed to join conversation:', error);
     }
@@ -189,13 +177,11 @@ export const useSocket = () => {
 
   // Start typing
   const startTyping = useCallback((conversationId: string) => {
-    if (!isConnected) {
-      console.log("Cannot start typing: not connected");
+      if (!isConnected) {
       return;
     }
 
     try {
-      console.log("Starting typing for conversation:", conversationId);
       socketService.startTyping(conversationId);
     } catch (error) {
       console.error('Failed to start typing:', error);
@@ -205,12 +191,10 @@ export const useSocket = () => {
   // Stop typing
   const stopTyping = useCallback((conversationId: string) => {
     if (!isConnected) {
-      console.log("Cannot stop typing: not connected");
       return;
     }
 
     try {
-      console.log("Stopping typing for conversation:", conversationId);
       socketService.stopTyping(conversationId);
     } catch (error) {
       console.error('Failed to stop typing:', error);

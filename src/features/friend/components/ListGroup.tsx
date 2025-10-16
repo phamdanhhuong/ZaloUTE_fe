@@ -32,8 +32,7 @@ export const ListGroup: React.FC<ListGroupProps> = ({
   onOpenGroup,
   onGroupSettings,
 }) => {
-  // Debug log
-  console.log('ListGroup groups:', groups);
+  // ListGroup initialized
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredGroups, setFilteredGroups] = useState<GroupItem[]>(groups);
   const [groupedGroups, setGroupedGroups] = useState<GroupedGroups>({});
