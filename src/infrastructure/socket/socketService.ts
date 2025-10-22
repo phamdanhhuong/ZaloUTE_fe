@@ -119,6 +119,7 @@ export const SOCKET_EVENTS = {
   // Conversation events
   GET_CONVERSATIONS: "get_conversations",
   GET_CONVERSATIONS_RESULT: "get_conversations_result",
+  CONVERSATION_UPDATED: "conversation_updated",
   JOIN_CONVERSATION: "join_conversation",
   LEAVE_CONVERSATION: "leave_conversation",
 
@@ -328,8 +329,15 @@ class SocketService {
       );
       return () => {}; // Return empty cleanup function
     }
-    this.socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, callback);
-    return () => this.socket?.off(SOCKET_EVENTS.RECEIVE_MESSAGE, callback);
+    const wrapped = (msg: SocketMessage) => {
+      try {
+        // Debug: hỗ trợ fallback nếu cần
+        // console.debug('[onReceiveMessage] message:', msg);
+      } catch {}
+      callback(msg);
+    };
+    this.socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, wrapped);
+    return () => this.socket?.off(SOCKET_EVENTS.RECEIVE_MESSAGE, wrapped);
   }
 
   onMessagesResult(callback: (messages: SocketMessage[]) => void): () => void {
@@ -355,6 +363,20 @@ class SocketService {
     this.socket.on(SOCKET_EVENTS.GET_CONVERSATIONS_RESULT, callback);
     return () =>
       this.socket?.off(SOCKET_EVENTS.GET_CONVERSATIONS_RESULT, callback);
+  }
+
+  onConversationUpdated(
+    callback: (data: { conversation: any; message?: any }) => void
+  ): () => void {
+    if (!this.socket) {
+      console.warn(
+        "Socket not connected, cannot register onConversationUpdated listener"
+      );
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.CONVERSATION_UPDATED, callback);
+    return () =>
+      this.socket?.off(SOCKET_EVENTS.CONVERSATION_UPDATED, callback);
   }
 
   onUserOnline(callback: (data: { userId: string }) => void): () => void {

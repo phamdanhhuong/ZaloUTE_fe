@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store";
 import { List, Avatar, Badge, Input, Button, Empty, Spin, Dropdown, Space, Typography } from "antd";
 import {
   SearchOutlined,
@@ -13,6 +15,7 @@ import {
 } from "@ant-design/icons";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useConversations } from "../hooks";
+import socketService from "@/infrastructure/socket/socketService";
 import { CreateGroupModal } from "./CreateGroupModal";
 import { GroupSettingsModal } from "./GroupSettingsModal";
 import type { Conversation } from "../service";
@@ -32,7 +35,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   onConversationSelect,
   currentUser,
 }) => {
-  const { loading, conversations, refreshConversations } = useConversations();
+  const { loading, conversations, refreshConversations, applyConversationUpdate } = useConversations();
+  const isConnected = useSelector((state: RootState) => state.chat.isConnected);
   const [searchText, setSearchText] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
@@ -250,6 +254,26 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     setSelectedGroupForSettings(null);
     setShowGroupSettingsModal(false);
   };
+
+  // Realtime: lắng nghe cập nhật hội thoại (đăng ký sau khi socket kết nối)
+  useEffect(() => {
+    if (!isConnected) return;
+    const offUpdated = socketService.onConversationUpdated((data) => {
+      if (data?.conversation) {
+        applyConversationUpdate(data.conversation);
+      } else {
+        refreshConversations();
+      }
+    });
+    // Fallback: nếu chỉ nhận RECEIVE_MESSAGE thì vẫn refresh danh sách
+    const offMsg = socketService.onReceiveMessage(() => {
+      refreshConversations();
+    });
+    return () => {
+      offUpdated && offUpdated();
+      offMsg && offMsg();
+    };
+  }, [isConnected, refreshConversations, applyConversationUpdate]);
 
   const getGroupActionMenu = (conversation: Conversation) => {
     if (conversation.type !== 'group') return undefined;
