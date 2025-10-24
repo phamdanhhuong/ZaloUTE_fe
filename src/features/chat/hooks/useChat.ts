@@ -66,12 +66,45 @@ export const useConversations = () => {
     }
   }, []);
 
+  // Cập nhật cục bộ khi có socket event, không cần reload
+  const applyConversationUpdate = useCallback((updated: Conversation) => {
+    setConversations(prev => {
+      if (!updated) return prev;
+      const getId = (obj: any) => {
+        const raw = obj?._id ?? obj?.id;
+        try {
+          return typeof raw === 'string' ? raw : raw?.toString?.() ?? String(raw);
+        } catch {
+          return String(raw);
+        }
+      };
+      const updatedId = getId(updated);
+      const idx = prev.findIndex(c => getId(c) === updatedId);
+      let next: Conversation[];
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = updated;
+      } else {
+        next = [updated, ...prev];
+      }
+      // Sắp xếp theo thời gian cập nhật mới nhất
+      return next.sort((a, b) => {
+        const getTime = (conv: Conversation) => {
+          const t = (conv.lastMessage as any)?.createdAt || (conv as any)?.updatedAt;
+          try { return new Date(t as any).getTime(); } catch { return 0; }
+        };
+        return getTime(b) - getTime(a);
+      });
+    });
+  }, []);
+
   return {
     loading,
     conversations,
     loadConversations,
     refreshConversations,
     handleCreateConversation,
+    applyConversationUpdate,
   };
 };
 
