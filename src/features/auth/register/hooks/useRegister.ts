@@ -74,11 +74,8 @@ export const useRegister = (onStepChange?: (step: CurrentStep) => void) => {
           lastname: formData.lastname,
           phone: formData.phone,
         };
-        //console.log("Register data:", registerData);
-
-        // In real app, call sendOTP API
-        const result = await sendOTP(registerData);
-        console.log("OTP response:", result);
+  // In real app, call sendOTP API
+  const result = await sendOTP(registerData);
         if (result.id !== undefined) {
           setCurrentStep("otp");
           onStepChange?.("otp");

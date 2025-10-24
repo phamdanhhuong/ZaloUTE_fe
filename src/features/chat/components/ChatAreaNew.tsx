@@ -23,6 +23,8 @@ import {
   Space,
   Dropdown,
   Progress,
+  Modal,
+  message as antdMessage,
 } from "antd";
 import {
   SearchOutlined,
@@ -66,7 +68,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   conversation,
   onConversationUpdate,
 }) => {
-  console.log("ChatAreaNew received conversation:", conversation);
+  // ChatArea initialized
 
   const dispatch = useDispatch();
   const {
@@ -107,6 +109,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }[]
   >([]);
   const [uploading, setUploading] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<
+    | {
+        room: string;
+        fromId: string;
+        messageId: string;
+      }
+    | null
+  >(null);
+  const [outgoingCall, setOutgoingCall] = useState<
+    | { room: string; status: "ringing" | "rejected" | "accepted" }
+    | null
+  >(null);
+  const lastProcessedCallMessageId = useRef<string | null>(null);
+  const CALL_INVITE_PREFIX = "[CALL_INVITE]";
+  const CALL_ACCEPT_PREFIX = "[CALL_ACCEPT]";
+  const CALL_REJECT_PREFIX = "[CALL_REJECT]";
+  const CALL_ENDED_PREFIX = "[CALL_ENDED]";
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingMessage, setEditingMessage] = useState<{
     id: string;
@@ -143,16 +162,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Set active conversation and load messages
   useEffect(() => {
     if (conversation && conversation._id !== activeConversationId) {
-      console.log("Setting active conversation:", conversation._id);
+  // set active conversation
       dispatch(setActiveConversationId(conversation._id));
 
       // Use async functions properly
       const initializeConversation = async () => {
         try {
-          console.log(
-            "Joining conversation and loading messages for:",
-            conversation._id
-          );
+          // joining conversation and loading messages
           await joinConversation(conversation._id);
           await getMessages({ conversationId: conversation._id, limit: 50 });
 
@@ -178,6 +194,91 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     getMessages,
   ]);
 
+  // Top-level effect: handle call control messages (invite/accept/reject)
+  useEffect(() => {
+    if (!conversation) return;
+
+    const last = conversationMessages[conversationMessages.length - 1];
+    if (!last) return;
+
+    const content = last.content || "";
+    const senderId = last.sender?._id;
+    const msgId = last._id;
+
+    if (lastProcessedCallMessageId.current === msgId) return;
+
+    if (content.startsWith(CALL_INVITE_PREFIX)) {
+      try {
+        const payload = JSON.parse(content.substring(CALL_INVITE_PREFIX.length));
+        const inviteRoom = payload?.room;
+        // Check if there is a later CALL_ENDED for the same invite room in this conversation
+        if (inviteRoom) {
+          const inviteIndex = conversationMessages.findIndex(m => m._id === msgId);
+          const endedIndex = conversationMessages.findIndex(m => {
+            try {
+              const c = m.content || "";
+              if (typeof c === 'string' && c.startsWith(CALL_ENDED_PREFIX)) {
+                const p = JSON.parse(c.substring(CALL_ENDED_PREFIX.length));
+                return p?.room === inviteRoom;
+              }
+            } catch (e) {
+              return false;
+            }
+            return false;
+          });
+          // if a CALL_ENDED exists after the invite, skip treating this invite as active
+          if (endedIndex !== -1 && endedIndex >= inviteIndex) {
+            lastProcessedCallMessageId.current = msgId;
+            return;
+          }
+        }
+        if (senderId !== currentUser?.id) {
+          setIncomingCall({ room: payload.room, fromId: senderId, messageId: msgId });
+          lastProcessedCallMessageId.current = msgId;
+        }
+      } catch (e) {
+        console.warn('Malformed call invite payload', e);
+      }
+    } else if (content.startsWith(CALL_ACCEPT_PREFIX)) {
+      try {
+        const payload = JSON.parse(content.substring(CALL_ACCEPT_PREFIX.length));
+        if (payload.room && senderId !== currentUser?.id) {
+          setOutgoingCall({ room: payload.room, status: "accepted" });
+          window.open(`/call?room=${encodeURIComponent(payload.room)}`, "_blank");
+          lastProcessedCallMessageId.current = msgId;
+        }
+      } catch (e) {
+        console.warn('Malformed call accept payload', e);
+      }
+    } else if (content.startsWith(CALL_REJECT_PREFIX)) {
+      try {
+        const payload = JSON.parse(content.substring(CALL_REJECT_PREFIX.length));
+        if (senderId !== currentUser?.id) {
+          setOutgoingCall({ room: payload.room, status: "rejected" });
+          antdMessage.info('Cuộc gọi bị từ chối');
+          lastProcessedCallMessageId.current = msgId;
+        }
+      } catch (e) {
+        console.warn('Malformed call reject payload', e);
+      }
+    } else if (content.startsWith(CALL_ENDED_PREFIX)) {
+      // If the last message marks the call as ended, clear any incoming/outgoing call UI
+      try {
+        // If the ended message refers to a room, and it matches current incoming/outgoing, clear state
+        const payload = JSON.parse(content.substring(CALL_ENDED_PREFIX.length));
+        const endedRoom = payload?.room;
+        if (endedRoom) {
+          if (incomingCall && incomingCall.room === endedRoom) setIncomingCall(null);
+          if (outgoingCall && outgoingCall.room === endedRoom) setOutgoingCall(null);
+          lastProcessedCallMessageId.current = msgId;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationMessages, conversation, currentUser]);
+
   // Auto mark messages as read when new messages arrive while user is in conversation
   useEffect(() => {
     if (activeConversationId && conversationMessages.length > 0) {
@@ -201,10 +302,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       activeConversationId === conversation?._id
     ) {
       // Rejoin conversation and reload messages when socket reconnects
-      console.log(
-        "Socket reconnected, rejoining conversation:",
-        activeConversationId
-      );
+      // socket reconnected: rejoining conversation
 
       const reconnectConversation = async () => {
         try {
@@ -333,18 +431,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   ) => {
     if ((!content.trim() && !file) || sending || !conversation) return;
 
-    console.log(
-      "Sending message:",
-      content,
-      "type:",
-      type,
-      "file:",
-      file?.name,
-      "to conversation:",
-      conversation._id,
-      "isConnected:",
-      isConnected
-    );
+    // sending message (logs removed)
 
     setSending(true);
     setUploading(!!file);
@@ -355,7 +442,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       // If sending a file, upload it first
       if (file) {
-        console.log("Uploading file:", file.name);
+  // uploading file
 
         // Update progress for this specific file
         if (fileIndex !== undefined) {
@@ -390,7 +477,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           fileUrl = uploadResult.url;
           messageContent = uploadResult.url; // Send the uploaded file URL
-          console.log("File uploaded successfully:", fileUrl);
+          // file uploaded successfully
         } catch (uploadError) {
           console.error("File upload failed:", uploadError);
           throw new Error(`Failed to upload file: ${file.name}`);
@@ -402,7 +489,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         content: messageContent.trim() || fileUrl || file?.name || "",
         type,
       });
-      console.log("Message sent successfully");
+  // message sent
 
       // Clear input and files only if not sending multiple files
       if (!file || fileIndex === undefined) {
@@ -443,6 +530,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     } else {
       // Send text message
       await handleSendMessage(messageInput, "text");
+    }
+  };
+
+  // Call control helpers
+  const acceptCall = async () => {
+    if (!incomingCall) return;
+    try {
+      // Send accept control message
+      await handleSendMessage(
+        CALL_ACCEPT_PREFIX + JSON.stringify({ room: incomingCall.room }),
+        "text"
+      );
+      // Open call page for callee
+      window.open(`/call?room=${encodeURIComponent(incomingCall.room)}`, "_blank");
+      setIncomingCall(null);
+    } catch (e) {
+      console.error("Failed to accept call", e);
+    }
+  };
+
+  const rejectCall = async () => {
+    if (!incomingCall) return;
+    try {
+      await handleSendMessage(
+        CALL_REJECT_PREFIX + JSON.stringify({ room: incomingCall.room }),
+        "text"
+      );
+      setIncomingCall(null);
+      antdMessage.info("Bạn đã từ chối cuộc gọi");
+    } catch (e) {
+      console.error("Failed to reject call", e);
     }
   };
 
@@ -625,16 +743,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     if (!conversation) return;
 
-    console.log(
-      "Input change, isConnected:",
-      isConnected,
-      "conversation:",
-      conversation._id
-    );
+    // input changed
 
     // Handle typing indicators
     if (value.trim()) {
-      console.log("Starting typing for conversation:", conversation._id);
+  // starting typing
       startTyping(conversation._id);
 
       // Clear existing timeout
@@ -644,17 +757,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       // Set new timeout to stop typing after 3 seconds of inactivity
       typingTimeoutRef.current = setTimeout(() => {
-        console.log("Stopping typing for conversation:", conversation._id);
+        // stop typing
         stopTyping(conversation._id);
       }, 3000);
     } else {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      console.log(
-        "Stopping typing (empty input) for conversation:",
-        conversation._id
-      );
+      // stopping typing (empty input)
       stopTyping(conversation._id);
     }
   };
@@ -757,6 +867,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             type="text"
             icon={<PhoneOutlined />}
             className={styles.actionButton}
+            onClick={async () => {
+              if (!conversation) return;
+              const room = `call_${conversation._id}_${Date.now()}`;
+              try {
+                await handleSendMessage(
+                  CALL_INVITE_PREFIX + JSON.stringify({ room }),
+                  "text"
+                );
+                setOutgoingCall({ room, status: "ringing" });
+                window.open(`/call?room=${encodeURIComponent(room)}`, "_blank");
+              } catch (e) {
+                console.error("Failed to initiate call", e);
+              }
+            }}
           />
           <Button
             type="text"
@@ -1420,6 +1544,43 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         )}
       </div>
+      {/* Incoming call modal (uses chat control messages) */}
+      <Modal
+        title="Cuộc gọi đến"
+        open={!!incomingCall}
+        onCancel={() => setIncomingCall(null)}
+        footer={null}
+        centered
+      >
+        {incomingCall && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>Cuộc gọi từ: {incomingCall.fromId}</div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Button onClick={rejectCall}>Từ chối</Button>
+              <Button type="primary" onClick={acceptCall}>
+                Đồng ý
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Outgoing call status small toast/modal */}
+      <Modal
+        title="Cuộc gọi"
+        open={!!outgoingCall}
+        footer={null}
+        onCancel={() => setOutgoingCall(null)}
+        centered
+      >
+        {outgoingCall && (
+          <div>
+            {outgoingCall.status === "ringing" && <div>Đang gọi...</div>}
+            {outgoingCall.status === "accepted" && <div>Cuộc gọi được chấp nhận, mở tab gọi...</div>}
+            {outgoingCall.status === "rejected" && <div>Cuộc gọi bị từ chối</div>}
+          </div>
+        )}
+      </Modal>
       
       {/* Edit Message Modal */}
       <EditMessageModal

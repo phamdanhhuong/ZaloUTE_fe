@@ -52,13 +52,13 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     if (visible) {
       loadFriends();
     } else {
-      form.resetFields();
+      // Avoid calling form.resetFields() here to prevent "useForm instance is not connected" warning
       setSelectedMembers([]);
       setFilteredFriends([]);
       setSearchQuery("");
       setFriends([]);
     }
-  }, [visible, form]);
+  }, [visible]);
 
   // Load friends function
   const loadFriends = async () => {

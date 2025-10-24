@@ -230,12 +230,12 @@ export const Friend: React.FC<FriendProps> = ({
         );
       case "friend-requests":
         return (
-          <FriendRequests
+            <FriendRequests
             onAcceptRequest={(requestId) => {
-              console.log("Accepted friend request:", requestId);
+              // Friend request accepted
             }}
             onRejectRequest={(requestId) => {
-              console.log("Rejected friend request:", requestId);
+              // Friend request rejected
             }}
           />
         );

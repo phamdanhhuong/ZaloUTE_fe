@@ -37,7 +37,7 @@ const ForgotPasswordForm: React.FC = () => {
             setLoading(true);
             try {
               const res = await sendForgotPasswordEmail(email);
-              console.log("Forgot password email response:", res);
+              // Forgot password email response handled
               // Nếu response có statusCode 201 hoặc message thành công thì chuyển bước
               if (res && res.message?.toLowerCase().includes("success")) {
                 setEmail(email);
@@ -63,7 +63,7 @@ const ForgotPasswordForm: React.FC = () => {
                 email,
                 otp: otpValue,
               });
-              console.log("Verify OTP response:", res);
+              // Verify OTP response handled
               if (res && res.message?.toLowerCase().includes("success")) {
                 setOtp(otpValue);
                 handleNext();
@@ -83,26 +83,17 @@ const ForgotPasswordForm: React.FC = () => {
           onNext={async (password) => {
             setLoading(true);
             try {
-              console.log("[DEBUG] Reset password step called");
-              console.log("[DEBUG] Email:", email);
-              console.log("[DEBUG] OTP:", otp);
-              console.log("[DEBUG] New password:", password);
               const params = { email, otp, newPassword: password };
-              console.log("[DEBUG] Params to resetPassword:", params);
               const res = await resetPassword(params);
-              console.log("[DEBUG] Response from resetPassword:", res);
               if (res && res.message?.toLowerCase().includes("success")) {
-                console.log(
-                  "[DEBUG] Password reset successful, moving to next step"
-                );
                 message.success("Đổi mật khẩu thành công!");
                 handleNext();
               } else {
-                console.error("[DEBUG] Password reset failed:", res);
+                console.error("Password reset failed:", res);
                 message.error(res.message || "Đặt lại mật khẩu thất bại");
               }
             } catch (err) {
-              console.error("[DEBUG] Exception during password reset:", err);
+              console.error("Exception during password reset:", err);
               message.error("Đặt lại mật khẩu thất bại");
             } finally {
               setLoading(false);

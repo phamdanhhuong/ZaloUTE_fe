@@ -50,7 +50,6 @@ export const useSocket = () => {
 
       // Message events
       unsubscribers.push(socketService.onReceiveMessage((message: SocketMessage) => {
-        console.log("Received message via socket:", message);
         dispatch(addMessage(message));
         
         // If we're currently in this conversation and the message is not from us, mark as read
@@ -63,7 +62,6 @@ export const useSocket = () => {
       }));
 
       unsubscribers.push(socketService.onMessagesResult((messages: SocketMessage[]) => {
-        console.log("Received messages result:", messages.length, "messages");
         if (activeConversationId) {
           dispatch(setMessages({ conversationId: activeConversationId, messages }));
         }
@@ -85,12 +83,10 @@ export const useSocket = () => {
 
       // Typing events
       unsubscribers.push(socketService.onTypingStart((data) => {
-        console.log("Received typing start:", data);
         dispatch(addTypingUser({ userId: data.userId, conversationId: data.conversationId }));
       }));
 
       unsubscribers.push(socketService.onTypingStop((data) => {
-        console.log("Received typing stop:", data);
         dispatch(removeTypingUser({ userId: data.userId, conversationId: data.conversationId }));
       }));
 
@@ -103,13 +99,11 @@ export const useSocket = () => {
 
       // Reaction events
       unsubscribers.push(socketService.onMessageReactionUpdated((data) => {
-        console.log('Received MESSAGE_REACTION_UPDATED:', data);
         dispatch(updateMessageReactions(data));
       }));
 
       // Messages read events
       unsubscribers.push(socketService.onMessagesRead((data) => {
-        console.log('Received MESSAGES_READ:', data);
         dispatch(markMessagesAsRead(data));
       }));
 
@@ -137,11 +131,8 @@ export const useSocket = () => {
 
       // Group events
       unsubscribers.push(socketService.onGroupDissolved((data) => {
-        console.log('Group dissolved:', data);
         // Remove the dissolved group from conversations
         dispatch(removeConversation({ conversationId: data.conversationId }));
-        // Show notification
-        console.log(`Group dissolved: ${data.message}`);
       }));
 
       unsubscribeRefs.current = unsubscribers;
@@ -172,9 +163,7 @@ export const useSocket = () => {
   // Send message
   const sendMessage = useCallback(async (data: SendMessageData) => {
     try {
-      console.log("Attempting to send message:", data);
-      await socketService.sendMessage(data);
-      console.log("Message sent via socket");
+  await socketService.sendMessage(data);
     } catch (error) {
       console.error('Failed to send message:', error);
       dispatch(setError('Failed to send message'));
@@ -194,8 +183,7 @@ export const useSocket = () => {
   // Join conversation
   const joinConversation = useCallback(async (conversationId: string) => {
     try {
-      console.log('Joining socket room:', conversationId);
-      await socketService.joinConversation(conversationId);
+  await socketService.joinConversation(conversationId);
     } catch (error) {
       console.error('Failed to join conversation:', error);
     }
@@ -214,13 +202,11 @@ export const useSocket = () => {
 
   // Start typing
   const startTyping = useCallback((conversationId: string) => {
-    if (!isConnected) {
-      console.log("Cannot start typing: not connected");
+      if (!isConnected) {
       return;
     }
 
     try {
-      console.log("Starting typing for conversation:", conversationId);
       socketService.startTyping(conversationId);
     } catch (error) {
       console.error('Failed to start typing:', error);
@@ -230,12 +216,10 @@ export const useSocket = () => {
   // Stop typing
   const stopTyping = useCallback((conversationId: string) => {
     if (!isConnected) {
-      console.log("Cannot stop typing: not connected");
       return;
     }
 
     try {
-      console.log("Stopping typing for conversation:", conversationId);
       socketService.stopTyping(conversationId);
     } catch (error) {
       console.error('Failed to stop typing:', error);
@@ -262,26 +246,104 @@ export const useSocket = () => {
     }
   }, [dispatch]);
 
-  // Auto connect when token is available
+  // NOTE: connection lifecycle is managed by a top-level SocketProvider.
+  // This hook only registers listeners when a socket is available and
+  // cleans up event listeners on unmount.
   useEffect(() => {
-    if (token && !isConnected) {
-      connect();
-    }
-  }, [token, isConnected, connect]);
+    // If socket already connected, listeners are attached in connect(); but
+    // for safety, attempt to attach by ensuring a connection exists first.
+    let mounted = true;
 
-  // Auto disconnect when token is removed
-  useEffect(() => {
-    if (!token && isConnected) {
-      disconnect();
-    }
-  }, [token, isConnected, disconnect]);
+    const attach = async () => {
+      try {
+        if (!socketService.isConnected()) {
+          // wait up to 5s for provider to connect by polling isConnected()
+          const start = Date.now();
+          while (!socketService.isConnected() && Date.now() - start < 5000) {
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((r) => setTimeout(r, 100));
+          }
+        }
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      disconnect();
+        if (!mounted) return;
+
+        // If connected, attach listeners by re-using connect() logic
+        if (socketService.isConnected() && unsubscribeRefs.current.length === 0) {
+          // reuse the connect function's listener registration by calling connect()
+          // but since connect() previously created socket, here we only execute
+          // the listener registration block manually.
+          const unsubscribers: (() => void)[] = [];
+
+          unsubscribers.push(socketService.onReceiveMessage((message: SocketMessage) => {
+            dispatch(addMessage(message));
+            if (activeConversationId === message.conversation && 
+                message.sender._id !== currentUser?.id && 
+                !message.isRead) {
+              markAsRead(message.conversation);
+            }
+          }));
+
+          unsubscribers.push(socketService.onMessagesResult((messages: SocketMessage[]) => {
+            if (activeConversationId) {
+              dispatch(setMessages({ conversationId: activeConversationId, messages }));
+            }
+          }));
+
+          // ... re-attach other listeners same as in connect()
+          unsubscribers.push(socketService.onConversationsResult((conversations: SocketConversation[]) => {
+            dispatch(setConversations(conversations));
+          }));
+
+          unsubscribers.push(socketService.onUserOnline((data) => {
+            dispatch(addOnlineUser({ userId: data.userId }));
+          }));
+
+          unsubscribers.push(socketService.onUserOffline((data) => {
+            dispatch(removeOnlineUser({ userId: data.userId }));
+          }));
+
+          unsubscribers.push(socketService.onTypingStart((data) => {
+            dispatch(addTypingUser({ userId: data.userId, conversationId: data.conversationId }));
+          }));
+
+          unsubscribers.push(socketService.onTypingStop((data) => {
+            dispatch(removeTypingUser({ userId: data.userId, conversationId: data.conversationId }));
+          }));
+
+          unsubscribers.push(socketService.onError((error) => {
+            console.error('Socket error:', error);
+            console.error('Socket error details:', JSON.stringify(error, null, 2));
+            dispatch(setError(error.message || 'Socket error occurred'));
+          }));
+
+          unsubscribers.push(socketService.onMessageReactionUpdated((data) => {
+            dispatch(updateMessageReactions(data));
+          }));
+
+          unsubscribers.push(socketService.onMessagesRead((data) => {
+            dispatch(markMessagesAsRead(data));
+          }));
+
+          unsubscribers.push(socketService.onGroupDissolved((data) => {
+            dispatch(removeConversation({ conversationId: data.conversationId }));
+          }));
+
+          unsubscribeRefs.current = unsubscribers;
+        }
+      } catch (error) {
+        // ignore attach errors
+      }
     };
-  }, [disconnect]);
+
+    attach();
+
+    return () => {
+      mounted = false;
+      // cleanup event listeners
+      unsubscribeRefs.current.forEach(unsubscribe => unsubscribe());
+      unsubscribeRefs.current = [];
+    };
+  }, [activeConversationId, currentUser, dispatch]);
 
   const editMessage = useCallback(async (data: EditMessageData) => {
     try {
