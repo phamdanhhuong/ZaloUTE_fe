@@ -72,6 +72,15 @@ export interface SendReactionData {
   value: string;
 }
 
+export interface EditMessageData {
+  messageId: string;
+  content: string;
+}
+
+export interface DeleteMessageData {
+  messageId: string;
+}
+
 // Group management socket data interfaces
 export interface CreateGroupData {
   name: string;
@@ -115,6 +124,10 @@ export const SOCKET_EVENTS = {
   GET_MESSAGES_RESULT: "get_messages_result",
   MARK_AS_READ: "mark_as_read",
   MESSAGES_READ: "messages_read",
+  EDIT_MESSAGE: "edit_message",
+  MESSAGE_EDITED: "message_edited",
+  DELETE_MESSAGE: "delete_message",
+  MESSAGE_DELETED: "message_deleted",
 
   // Conversation events
   GET_CONVERSATIONS: "get_conversations",
@@ -260,6 +273,28 @@ class SocketService {
       this.socket!.emit(SOCKET_EVENTS.MARK_AS_READ, { conversationId });
     } catch (error) {
       console.error("Failed to mark as read:", error);
+      throw error;
+    }
+  }
+
+  // Edit message
+  async editMessage(data: EditMessageData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.EDIT_MESSAGE, data);
+    } catch (error) {
+      console.error("Failed to edit message:", error);
+      throw error;
+    }
+  }
+
+  // Delete message
+  async deleteMessage(data: DeleteMessageData): Promise<void> {
+    try {
+      await this.waitForConnection();
+      this.socket!.emit(SOCKET_EVENTS.DELETE_MESSAGE, data);
+    } catch (error) {
+      console.error("Failed to delete message:", error);
       throw error;
     }
   }
@@ -653,6 +688,40 @@ class SocketService {
     }
     this.socket.on(SOCKET_EVENTS.MESSAGES_READ, callback);
     return () => this.socket?.off(SOCKET_EVENTS.MESSAGES_READ, callback);
+  }
+
+  onMessageEdited(
+    callback: (data: {
+      messageId: string;
+      conversationId: string;
+      updatedMessage: SocketMessage;
+      editedBy: string;
+      editedAt: string;
+    }) => void
+  ): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onMessageEdited listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.MESSAGE_EDITED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.MESSAGE_EDITED, callback);
+  }
+
+  onMessageDeleted(
+    callback: (data: {
+      messageId: string;
+      conversationId: string;
+      deletedMessage: SocketMessage;
+      deletedBy: string;
+      deletedAt: string;
+    }) => void
+  ): () => void {
+    if (!this.socket) {
+      console.warn("Socket not connected, cannot register onMessageDeleted listener");
+      return () => {};
+    }
+    this.socket.on(SOCKET_EVENTS.MESSAGE_DELETED, callback);
+    return () => this.socket?.off(SOCKET_EVENTS.MESSAGE_DELETED, callback);
   }
 
   // Dissolve group

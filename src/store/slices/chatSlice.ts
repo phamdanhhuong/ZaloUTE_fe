@@ -150,6 +150,18 @@ export const chatSlice = createSlice({
       }
     },
 
+    // Update message (for editing)
+    updateMessage: (state, action: PayloadAction<{ messageId: string; conversationId: string; updatedMessage: SocketMessage }>) => {
+      const { messageId, conversationId, updatedMessage } = action.payload;
+      const msgs = state.messages[conversationId];
+      if (msgs) {
+        const messageIndex = msgs.findIndex(msg => msg._id === messageId);
+        if (messageIndex !== -1) {
+          msgs[messageIndex] = updatedMessage;
+        }
+      }
+    },
+
     // Typing indicators
     addTypingUser: (state, action: PayloadAction<TypingUser>) => {
       const typingUser = action.payload;
@@ -209,6 +221,7 @@ export const {
   clearChatData,
   updateMessageReactions,
   markMessagesAsRead,
+  updateMessage,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

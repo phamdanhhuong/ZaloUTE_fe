@@ -36,11 +36,15 @@ import {
   SettingOutlined,
   MoreOutlined,
   CrownOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useSocket } from "../hooks/useSocket";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
+import { message as antdMessage } from "antd";
+import { EditMessageModal } from "./EditMessageModal";
 import { setActiveConversationId } from "@/store/slices/chatSlice";
 import {
   SocketMessage,
@@ -74,6 +78,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     isConnected,
     sendReaction,
     markAsRead,
+    editMessage,
+    deleteMessage,
   } = useSocket();
   const {
     messages,
@@ -101,6 +107,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }[]
   >([]);
   const [uploading, setUploading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<{
+    id: string;
+    content: string;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -432,6 +443,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     } else {
       // Send text message
       await handleSendMessage(messageInput, "text");
+    }
+  };
+
+  // Edit message handlers
+  const handleEditMessage = (messageId: string, currentContent: string) => {
+    setEditingMessage({ id: messageId, content: currentContent });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (messageId: string, newContent: string) => {
+    try {
+      await editMessage({ messageId, content: newContent });
+    } catch (error) {
+      console.error('Failed to edit message:', error);
+      throw error;
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false);
+    setEditingMessage(null);
+  };
+
+  // Delete message handlers
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      await deleteMessage({ messageId });
+      antdMessage.success('Tin nhắn đã được thu hồi');
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      antdMessage.error('Thu hồi tin nhắn thất bại');
     }
   };
 
@@ -990,6 +1032,46 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           )}
                         </div>
                       </div>
+                      
+                      {/* Message menu for current user's messages */}
+                      {isCurrentUser && message.type === 'text' && (
+                        <div style={{ position: 'absolute', top: 4, right: 4, opacity: 0.7 }}>
+                          <Dropdown
+                            menu={{
+                              items: [
+                                {
+                                  key: 'edit',
+                                  label: 'Sửa tin nhắn',
+                                  icon: <EditOutlined />,
+                                  onClick: () => handleEditMessage(message._id, message.content),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Thu hồi tin nhắn',
+                                  icon: <DeleteOutlined />,
+                                  danger: true,
+                                  onClick: () => handleDeleteMessage(message._id),
+                                },
+                              ],
+                            }}
+                            trigger={['click']}
+                            placement="bottomRight"
+                          >
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<MoreOutlined />}
+                              style={{ 
+                                color: '#666',
+                                fontSize: '12px',
+                                padding: '2px 4px',
+                                height: 'auto',
+                                minWidth: 'auto'
+                              }}
+                            />
+                          </Dropdown>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1338,6 +1420,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         )}
       </div>
+      
+      {/* Edit Message Modal */}
+      <EditMessageModal
+        visible={showEditModal}
+        messageId={editingMessage?.id || ''}
+        currentContent={editingMessage?.content || ''}
+        onCancel={handleCancelEdit}
+        onSave={handleSaveEdit}
+      />
     </div>
   );
 };

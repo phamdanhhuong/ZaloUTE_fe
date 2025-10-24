@@ -15,14 +15,17 @@ import {
   removeOnlineUser,
   clearChatData,
   updateMessageReactions,
-  markMessagesAsRead
+  markMessagesAsRead,
+  updateMessage
 } from '@/store/slices/chatSlice';
 import socketService, { 
   SendMessageData, 
   GetMessagesData,
   SocketMessage,
   SocketConversation,
-  SendReactionData
+  SendReactionData,
+  EditMessageData,
+  DeleteMessageData
 } from '@/infrastructure/socket/socketService';
 
 export const useSocket = () => {
@@ -108,6 +111,28 @@ export const useSocket = () => {
       unsubscribers.push(socketService.onMessagesRead((data) => {
         console.log('Received MESSAGES_READ:', data);
         dispatch(markMessagesAsRead(data));
+      }));
+
+      // Message edited events
+      unsubscribers.push(socketService.onMessageEdited((data) => {
+        console.log('Received MESSAGE_EDITED:', data);
+        // Update the message in the store
+        dispatch(updateMessage({ 
+          messageId: data.messageId, 
+          conversationId: data.conversationId, 
+          updatedMessage: data.updatedMessage 
+        }));
+      }));
+
+      // Message deleted events
+      unsubscribers.push(socketService.onMessageDeleted((data) => {
+        console.log('Received MESSAGE_DELETED:', data);
+        // Update the message in the store
+        dispatch(updateMessage({ 
+          messageId: data.messageId, 
+          conversationId: data.conversationId, 
+          updatedMessage: data.deletedMessage 
+        }));
       }));
 
       // Group events
@@ -258,6 +283,24 @@ export const useSocket = () => {
     };
   }, [disconnect]);
 
+  const editMessage = useCallback(async (data: EditMessageData) => {
+    try {
+      await socketService.editMessage(data);
+    } catch (error) {
+      console.error('Failed to edit message:', error);
+      throw error;
+    }
+  }, []);
+
+  const deleteMessage = useCallback(async (data: DeleteMessageData) => {
+    try {
+      await socketService.deleteMessage(data);
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      throw error;
+    }
+  }, []);
+
   return {
     isConnected,
     connect,
@@ -270,5 +313,7 @@ export const useSocket = () => {
     stopTyping,
     sendReaction,
     markAsRead,
+    editMessage,
+    deleteMessage,
   };
 };
