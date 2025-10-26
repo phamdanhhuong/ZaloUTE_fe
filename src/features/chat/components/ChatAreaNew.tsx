@@ -39,9 +39,11 @@ import {
   CrownOutlined,
   EditOutlined,
   DeleteOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useSocket } from "../hooks/useSocket";
+import { useMessageSearch } from "../hooks/useChat";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import { message as antdMessage } from "antd";
@@ -130,9 +132,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     id: string;
     content: string;
   } | null>(null);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchHighlights, setShowSearchHighlights] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { loading: searchLoading, searchResults, handleSearch, clearSearch } = useMessageSearch();
 
   // Get messages for active conversation and ensure correct order
   const conversationMessages = React.useMemo(() => {
@@ -861,6 +867,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             type="text"
             icon={<SearchOutlined />}
             className={styles.actionButton}
+            onClick={() => setShowSearchModal(true)}
           />
           <Button
             type="text"
@@ -907,6 +914,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 index === 0 ||
                 conversationMessages[index - 1].sender?._id !==
                   message.sender?._id;
+              
+              // Check if this message is in search results and should be highlighted
+              const isSearchResult = showSearchHighlights && searchResults.some(
+                (r) => (r._id || message._id) && r._id === message._id
+              );
 
               // Handler: send reaction
               const handleReact = (reactionType: string) => {
@@ -951,9 +963,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               return (
                 <div
                   key={message._id}
+                  data-message-id={message._id}
                   className={`${styles.messageWrapper} ${
                     isCurrentUser ? styles.currentUser : styles.otherUser
-                  }`}
+                  } ${isSearchResult ? styles.searchResult : ''}`}
                 >
                   {!isCurrentUser &&
                     showAvatar &&
@@ -1589,6 +1602,125 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         onCancel={handleCancelEdit}
         onSave={handleSaveEdit}
       />
+
+      {/* Search Messages Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SearchOutlined />
+            <span>Tìm kiếm tin nhắn</span>
+          </div>
+        }
+        open={showSearchModal}
+        onCancel={() => {
+          setShowSearchModal(false);
+          setSearchQuery("");
+          clearSearch();
+          setShowSearchHighlights(true);
+        }}
+        footer={null}
+        width={600}
+        className={styles.searchModal}
+      >
+        <Input.Search
+          placeholder="Nhập từ khóa để tìm kiếm..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+          }}
+          onSearch={(value) => {
+            if (value.trim()) {
+              handleSearch(conversation._id, value);
+              setShowSearchHighlights(true);
+            } else {
+              clearSearch();
+              setShowSearchHighlights(true);
+            }
+          }}
+          loading={searchLoading}
+          enterButton
+          size="large"
+          style={{ marginBottom: 16 }}
+        />
+
+        {searchResults.length > 0 && (
+          <div className={styles.modalSearchResults}>
+            <div style={{ marginBottom: 12 }}>
+              <Text type="secondary">
+                Tìm thấy <strong>{searchResults.length}</strong> tin nhắn
+              </Text>
+            </div>
+            
+            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+              {searchResults.map((message) => {
+                const messageId = message._id || message.id;
+                return (
+                  <div
+                    key={messageId}
+                    className={styles.searchResultItem}
+                    onClick={() => {
+                      // Hide all search highlights
+                      setShowSearchHighlights(false);
+                      
+                      // Close modal and scroll to message
+                      setShowSearchModal(false);
+                      setTimeout(() => {
+                        // Find and highlight the selected message
+                        const messageElement = document.querySelector(
+                          `[data-message-id="${messageId}"]`
+                        );
+                        if (messageElement) {
+                          messageElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                          // Add highlight effect
+                          messageElement.classList.add(styles.highlightMessage);
+                          setTimeout(() => {
+                            messageElement.classList.remove(styles.highlightMessage);
+                          }, 2000);
+                        }
+                      }, 100);
+                    }}
+                  >
+                    <div className={styles.searchResultContent}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <UserAvatar
+                          user={{
+                            id: message.sender?._id || message.senderId || "",
+                            username: message.sender?.username || "",
+                            firstname: message.sender?.firstname || "",
+                            lastname: message.sender?.lastname || "",
+                            avatarUrl: message.sender?.avatarUrl,
+                          }}
+                          size={32}
+                        />
+                        <div>
+                          <Text strong style={{ display: 'block' }}>
+                            {message.sender?.firstname && message.sender?.lastname
+                              ? `${message.sender.firstname} ${message.sender.lastname}`
+                              : message.sender?.username || "Unknown"}
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {new Date(message.createdAt).toLocaleString("vi-VN")}
+                          </Text>
+                        </div>
+                      </div>
+                      <Text className={styles.searchResultText}>
+                        {message.content}
+                      </Text>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {!searchLoading && searchQuery && searchResults.length === 0 && (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="Không tìm thấy tin nhắn nào"
+          />
+        )}
+      </Modal>
     </div>
   );
 };

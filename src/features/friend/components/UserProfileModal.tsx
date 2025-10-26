@@ -7,6 +7,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import type { User } from "../service";
 import styles from "./UserProfileModal.module.css";
 
+
 interface UserProfileModalProps {
   visible: boolean;
   user: User | null;
@@ -164,19 +165,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               }
             >
               {formatDate(user.createdAt)}
-            </Descriptions.Item>
-
-            <Descriptions.Item
-              label={
-                <span className={styles.label}>
-                  <UserOutlined className={styles.labelIcon} />
-                  Trạng thái tài khoản
-                </span>
-              }
-            >
-              <Tag color={user.isActive ? "green" : "red"}>
-                {user.isActive ? "Hoạt động" : "Không hoạt động"}
-              </Tag>
             </Descriptions.Item>
 
             {user.friendsSince && (
