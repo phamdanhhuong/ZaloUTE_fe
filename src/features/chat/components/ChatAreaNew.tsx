@@ -23,8 +23,7 @@ import {
   Space,
   Dropdown,
   Progress,
-  Modal,
-  message as antdMessage,
+  Modal
 } from "antd";
 import {
   SearchOutlined,

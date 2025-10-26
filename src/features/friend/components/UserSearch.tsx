@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import { Input, Button, List, Spin, Empty } from "antd";
 import { SearchOutlined, UserAddOutlined } from "@ant-design/icons";
 import { UserAvatar } from "@/components/UserAvatar";
-import { useFriendSearch, useSendFriendRequest } from "../hooks";
+import { useFriendSearch, useSendFriendRequest, useUserProfile } from "../hooks";
+import { UserProfileModal } from "./UserProfileModal";
 import type { User } from "../service";
 import styles from "./UserSearch.module.css";
 
@@ -15,6 +16,9 @@ interface UserSearchProps {
 export const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [lastSearchParams, setLastSearchParams] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  
   const {
     loading: searchLoading,
     users,
@@ -22,6 +26,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect }) => {
     clearResults,
   } = useFriendSearch();
   const { loading: sendingRequest, handleSendRequest } = useSendFriendRequest();
+  const { loading: profileLoading, loadProfile, profile } = useUserProfile();
 
   const handleSearchSubmit = () => {
     if (!searchQuery.trim()) {
@@ -48,6 +53,36 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect }) => {
       if (lastSearchParams) {
         handleSearch(lastSearchParams);
       }
+    } catch (error) {
+      // Error đã được handle trong hook
+    }
+  };
+
+  const handleViewProfile = async (user: User) => {
+    setSelectedUser(user);
+    setModalVisible(true);
+    
+    // Load chi tiết profile của user
+    try {
+      await loadProfile(user.id);
+    } catch (error) {
+      // Error đã được handle trong hook
+    }
+  };
+
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setSelectedUser(null);
+  };
+
+  const handleModalSendFriendRequest = async (userId: string) => {
+    try {
+      await handleSendRequest(userId);
+      // Refresh search results và đóng modal
+      if (lastSearchParams) {
+        handleSearch(lastSearchParams);
+      }
+      handleCloseModal();
     } catch (error) {
       // Error đã được handle trong hook
     }
@@ -128,17 +163,15 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect }) => {
                     {getFriendshipStatusText(user)}
                   </span>
                 ) : null,
-                onUserSelect && (
-                  <Button
-                    key="view"
-                    type="text"
-                    onClick={() => onUserSelect(user)}
-                    size="small"
-                    className={`${styles.actionButton} ${styles.secondary}`}
-                  >
-                    Xem hồ sơ
-                  </Button>
-                ),
+                <Button
+                  key="view"
+                  type="text"
+                  onClick={() => handleViewProfile(user)}
+                  size="small"
+                  className={`${styles.actionButton} ${styles.secondary}`}
+                >
+                  Xem hồ sơ
+                </Button>,
               ].filter(Boolean)}
               className={styles.userItem}
             >
@@ -167,6 +200,15 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect }) => {
           className={styles.emptyState}
         />
       ) : null}
+      
+      {/* User Profile Modal */}
+      <UserProfileModal
+        visible={modalVisible}
+        user={profile || selectedUser}
+        loading={profileLoading}
+        onClose={handleCloseModal}
+        onSendFriendRequest={handleModalSendFriendRequest}
+      />
     </div>
   );
 };

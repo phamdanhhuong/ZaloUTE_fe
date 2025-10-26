@@ -1,0 +1,153 @@
+.modal {
+  .ant-modal-header {
+    border-bottom: 1px solid #f0f0f0;
+    padding: 16px 24px;
+  }
+
+  .ant-modal-body {
+    padding: 24px;
+  }
+
+  .ant-modal-footer {
+    border-top: 1px solid #f0f0f0;
+    padding: 12px 24px;
+  }
+}
+
+.modalTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.titleAvatar {
+  flex-shrink: 0;
+}
+
+.titleText {
+  font-size: 18px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.modalContent {
+  .ant-descriptions {
+    margin-top: 20px;
+  }
+}
+
+.userHeader {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 0;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 20px;
+}
+
+.userAvatar {
+  flex-shrink: 0;
+}
+
+.userInfo {
+  flex: 1;
+}
+
+.userName {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.username {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #8c8c8c;
+}
+
+.statusTag {
+  font-size: 14px;
+  padding: 4px 12px;
+  border-radius: 16px;
+}
+
+.descriptions {
+  .ant-descriptions-item-label {
+    background-color: #fafafa;
+    font-weight: 500;
+    width: 140px;
+  }
+
+  .ant-descriptions-item-content {
+    background-color: #fff;
+  }
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.labelIcon {
+  color: #1890ff;
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal {
+    .ant-modal {
+      width: 95% !important;
+      max-width: 500px;
+    }
+  }
+
+  .userHeader {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .userInfo {
+    text-align: center;
+  }
+
+  .descriptions {
+    .ant-descriptions-item-label {
+      width: 120px;
+    }
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .modalTitle .titleText {
+    color: #fff;
+  }
+
+  .userName {
+    color: #fff;
+  }
+
+  .username {
+    color: #a6a6a6;
+  }
+
+  .descriptions {
+    .ant-descriptions-item-label {
+      background-color: #1f1f1f;
+      color: #fff;
+    }
+
+    .ant-descriptions-item-content {
+      background-color: #141414;
+      color: #fff;
+    }
+  }
+
+  .userHeader {
+    border-bottom-color: #303030;
+  }
+}
