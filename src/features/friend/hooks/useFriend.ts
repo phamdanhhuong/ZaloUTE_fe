@@ -77,8 +77,11 @@ export const useFriends = () => {
       }
       return data;
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.message || "Tải danh sách bạn bè thất bại";
+      if (err?.response?.status === 401 || err?.__handled401) {
+        setFriends([]);
+        return;
+      }
+      const msg = err?.response?.data?.message || "Tải danh sách bạn bè thất bại";
       message.error(msg);
       // Reset state khi có lỗi
       setFriends([]);

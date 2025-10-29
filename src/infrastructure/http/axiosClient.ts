@@ -21,6 +21,7 @@ axiosClient.interceptors.request.use((config) => {
 });
 
 // Interceptor cho response
+let isRedirectingUnauthorized = false;
 axiosClient.interceptors.response.use(
   (response) => {
   // response interceptor - debug logs removed
@@ -39,7 +40,28 @@ axiosClient.interceptors.response.use(
   (error) => {
     // Xử lý lỗi chung (401, 500...)
     if (error.response?.status === 401) {
-      console.error("Unauthorized! Redirect to login...");
+      try {
+        // Đánh dấu đã xử lý để các nơi khác không hiển thị toast "Unauthorized"
+        (error as any).__handled401 = true;
+
+        if (typeof window !== "undefined") {
+          // Xóa thông tin xác thực cục bộ
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+
+          // Tránh redirect lặp lại
+          if (!isRedirectingUnauthorized) {
+            isRedirectingUnauthorized = true;
+            const onLoginPage = window.location.pathname === "/login";
+            if (!onLoginPage) {
+              // Dùng replace để không cho phép quay lại trang lỗi
+              window.location.replace("/login");
+            }
+          }
+        }
+      } catch (e) {
+        // noop
+      }
     }
     return Promise.reject(error);
   }

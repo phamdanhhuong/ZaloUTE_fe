@@ -15,14 +15,16 @@ export const useLogin = () => {
     dispatch(setLoading(true));
     try {
       const data: LoginResponse = await login(values);
+      if (!data.user.isActive) {
+        message.error("Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để kích hoạt hoặc liên hệ hỗ trợ.");
+        throw new Error("ACCOUNT_NOT_ACTIVE");
+      }
 
-      // Save to localStorage and Redux
       if (typeof window !== "undefined") {
         localStorage.setItem("token", data.accessToken);
         localStorage.setItem("user", JSON.stringify(data.user));
       }
 
-      // Update Redux state
       dispatch(
         loginSuccess({
           user: data.user,
@@ -32,7 +34,6 @@ export const useLogin = () => {
 
       message.success("Đăng nhập thành công!");
       
-      // Navigate to home page after successful login
       router.push('/');
       
       return data;

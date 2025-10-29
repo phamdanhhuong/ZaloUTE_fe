@@ -27,6 +27,10 @@ export const useConversations = () => {
       setConversations(data);
       return data;
     } catch (err: any) {
+      if (err?.response?.status === 401 || err?.__handled401) {
+        setConversations([]);
+        return;
+      }
       const msg = err?.response?.data?.message || "Tải cuộc trò chuyện thất bại";
       antdMessage.error(msg);
       throw err;

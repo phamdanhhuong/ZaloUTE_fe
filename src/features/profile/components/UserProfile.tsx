@@ -31,7 +31,8 @@ export const UserProfile: React.FC = () => {
 
   const handleSaveProfile = async (data: UpdateProfileRequest) => {
     await updateProfile(data);
-    setIsEditing(false); 
+    await refreshProfile();
+    setIsEditing(false);
   };
 
   const handleAvatarUpload: UploadProps['customRequest'] = async (options) => {
